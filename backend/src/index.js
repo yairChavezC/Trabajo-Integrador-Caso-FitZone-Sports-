@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const pool = require('./config/db');
 const initGlobalMiddlewares = require('./core/middlewares/globalMiddlewares');
+const errorHandler = require('./core/middlewares/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
