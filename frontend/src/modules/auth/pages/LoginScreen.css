@@ -1,97 +1,212 @@
-/* Contenedor principal que ocupa toda la pantalla y centra la tarjeta */
+/* Contenedor general centrado */
 .login-container {
   min-height: 100vh;
+  width: 100%;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #f1f5f9;
-  padding: 1rem;
+  background-color: #f8fafc;
+  padding: 2rem 1rem;
   box-sizing: border-box;
 }
 
-/* Tarjeta flotante */
-.login-card {
-  width: 100%;
-  max-width: 400px;
-  background: #ffffff;
-  padding: 2.5rem 2rem;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+/* Marca superior FitZone */
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 2rem;
 }
 
-.login-card h2 {
-  margin: 0 0 1.5rem 0;
+.brand-badge {
+  background: #4f46e5;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1.25rem;
+  padding: 6px 12px;
+  border-radius: 10px;
+  letter-spacing: -0.5px;
+}
+
+.brand-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.brand-title {
+  font-size: 1.6rem;
+  font-weight: 900;
   color: #0f172a;
-  font-size: 1.5rem;
-  text-align: center;
-  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+  font-size: 1.2rem;
+  font-weight: 400;
+  color: #6366f1;
+}
+
+/* Barra de pestañas superiores */
+.login-tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  padding: 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  margin-bottom: 1.5rem;
+}
+
+.login-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.login-tab-btn:hover:not(.activo) {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.login-tab-btn.activo {
+  background: #4f46e5;
+  color: #ffffff;
+  box-shadow: 0 4px 10px -2px rgba(79, 70, 229, 0.35);
+}
+
+/* Tarjeta principal de login */
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  padding: 2.5rem;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 25px -4px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  box-sizing: border-box;
+}
+
+.login-card-header {
+  margin-bottom: 1.75rem;
+}
+
+.login-card-header h2 {
+  margin: 0 0 0.4rem 0;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.login-card-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 /* Mensaje de error */
 .error-message {
   background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: 10px;
   margin-bottom: 1.25rem;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   text-align: center;
 }
 
-/* Agrupación de labels e inputs */
+/* Grupos de formulario e inputs */
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
   margin-bottom: 1.25rem;
 }
 
 .form-group label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #475569;
 }
 
-.form-group input {
-  padding: 0.65rem 0.85rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
-.form-group input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.form-group input:disabled {
+.input-wrapper input {
+  width: 100%;
+  padding: 0.75rem 1rem;
   background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  color: #0f172a;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.input-wrapper input:focus {
+  background-color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.input-wrapper input::placeholder {
+  color: #94a3b8;
+}
+
+.input-wrapper input:disabled {
+  background-color: #f1f5f9;
   cursor: not-allowed;
 }
 
-/* Botón de ingreso */
+.input-icon {
+  position: absolute;
+  right: 14px;
+  font-size: 0.95rem;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Botón principal */
 .btn-login {
   width: 100%;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
-  background-color: #2563eb;
+  padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
+  background-color: #4f46e5;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 0.95rem;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px -2px rgba(79, 70, 229, 0.4);
 }
 
 .btn-login:hover:not(:disabled) {
-  background-color: #1d4ed8;
+  background-color: #4338ca;
+  transform: translateY(-1px);
 }
 
 .btn-login:disabled {
-  background-color: #93c5fd;
+  background-color: #a5b4fc;
   cursor: not-allowed;
+  box-shadow: none;
 }
