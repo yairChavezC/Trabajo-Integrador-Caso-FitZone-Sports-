@@ -1,18 +1,12 @@
-// src/core/middlewares/index.js
-const express = require('express');
-const corsmiddleware = require('./cors');
-const errorHanddler = require('./errorHandler');
-const helmet = require('helmet');
-
+import express from 'express';
+import helmet from 'helmet';
+import corsmiddleware from './cors.js';
 
 const initGlobalMiddlewares = (app) => {
-
   app.use(corsmiddleware);
-
   app.use(helmet());
-  
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 };
 
-module.exports = initGlobalMiddlewares;
+export default initGlobalMiddlewares;

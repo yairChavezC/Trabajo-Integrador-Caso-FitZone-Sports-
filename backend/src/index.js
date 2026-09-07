@@ -1,19 +1,18 @@
-require('dotenv').config();
-const express = require('express');
-const pool = require('./config/db');
-const initGlobalMiddlewares = require('./core/middlewares/globalMiddlewares');
-const errorHandler = require('./core/middlewares/errorHandler');
+import 'dotenv/config';
+import express from 'express';
+import pool from './config/db.js';
+import aplicarMiddlewares from './core/middlewares/globalMiddlewares.js';
+import errorHandler from './core/middlewares/errorHandler.js';
+import apiRouter from './appRouter.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// 1. Middlewares globales (CORS, express.json, etc.) SIEMPRE antes de las rutas
+aplicarMiddlewares(app);
 
-// Aplicacion middlewares globales
-initGlobalMiddlewares(app);
-
-
-app.use(errorHandler);
+// 2. Rutas de la API
+app.use('/api', apiRouter);
 
 // Ruta de prueba contra Supabase
 app.get('/test-db', async (req, res) => {
@@ -25,6 +24,9 @@ app.get('/test-db', async (req, res) => {
     res.status(500).json({ error: 'Error al conectar con la base de datos' });
   }
 });
+
+// 3. Manejador de errores SIEMPRE al final de todas las rutas
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend corriendo en http://localhost:${PORT}/test-db`);

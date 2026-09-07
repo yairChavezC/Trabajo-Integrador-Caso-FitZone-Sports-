@@ -1,4 +1,3 @@
-// src/core/middlewares/errorHandler.js
 const errorHandler = (err, req, res, next) => {
   // Código de estado por defecto: 500 (Internal Server Error)
   const statusCode = err.statusCode || 500;
@@ -15,4 +14,4 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
-module.exports = errorHandler;
+export default errorHandler;

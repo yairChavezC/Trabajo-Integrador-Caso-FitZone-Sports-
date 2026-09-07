@@ -1,4 +1,17 @@
 :root {
+
+  /* src/index.css */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #0b0f19;
+}
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
