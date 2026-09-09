@@ -10,7 +10,7 @@ import { pagosRoutes } from './modules/pagos/routes';
 import { sociosRoutes } from './modules/socios/routes';
 import { SedeProvider } from './core/context/SedeContext';
 
-import { Layout } from './shared/components/MainLayout';
+import { MainLayout } from './shared/components/MainLayout';
 import {ProtectedRoute} from './shared/components/ProtectedRute'
 
 export default function App() {
@@ -18,7 +18,7 @@ export default function App() {
     <Router>
       <Routes>
         {authRoutes}
-        <Route path="/" element={<ProtectedRoute><SedeProvider><Layout /></SedeProvider></ProtectedRoute>}>
+        <Route path="/" element={<ProtectedRoute><SedeProvider><MainLayout /></SedeProvider></ProtectedRoute>}>
           {/* Redirección inicial al entrar a "/" */}
           <Route index element={<Navigate to="/canchas" replace />} />
           {/* Rutas de cada módulo */}

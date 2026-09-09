@@ -20,7 +20,6 @@ export function SedeSelector() {
 
   const handleSeleccionar = (sede) => {
     setSedeSeleccionada(sede);
-    localStorage.setItem('sedeId', String(sede.id));
     setAbierto(false);
   };
 
