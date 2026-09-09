@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSede } from '../../../core/context/SedeContext';
+import { useSede } from '../../../shared/context/SedeContext';
 import { CanchasFiltros } from '../components/CanchasFiltros';
 import { CanchaCard } from '../components/CanchaCard';
 import { CanchaDrawer } from '../components/CanchaDrawer';

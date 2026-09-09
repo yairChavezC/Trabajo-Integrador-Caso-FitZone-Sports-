@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginRequest } from '../services/authService';
+import { useAuth } from '../../../core/auth/AuthContext'; 
 
 export const useLogin = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [credenciales, setCredenciales] = useState({
     nombre_usuario: '',
-    contrasenia: ''
+    contrasenia: '',
   });
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
   const handleChange = (e) => {
-    setCredenciales(prev => ({
+    setCredenciales((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
@@ -25,11 +27,12 @@ export const useLogin = () => {
     setCargando(true);
 
     try {
+      // 1. Llamada HTTP a través de authService (usa httpClient)
       const data = await loginRequest(credenciales);
+      // 2. Notificamos al contexto global (guarda en estado y localStorage)
+      login(data);
 
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('usuario', JSON.stringify(data.usuario));
-
+      // 3. Redirigimos a la vista inicial autenticada
       navigate('/canchas', { replace: true });
     } catch (err) {
       setError(err.message || 'Error de conexión');

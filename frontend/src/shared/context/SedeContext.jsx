@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { obtenerSedesApi } from '../api/sedeService';
+import { obtenerSedesApi } from '../services/sedeService';
 
 const SedeContext = createContext();
 

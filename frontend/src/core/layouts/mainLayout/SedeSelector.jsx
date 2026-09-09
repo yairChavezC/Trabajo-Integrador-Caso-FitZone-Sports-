@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSede } from '../../core/context/SedeContext';
+import { useSede } from '../../../shared/context/SedeContext';
 import './SedeSelector.css';
 
 export function SedeSelector() {
