@@ -3,6 +3,7 @@ import authRoutes from './modules/auth/authRoutes.js';
 import sedeRoutes from './modules/sedes/routes/sedeRoutes.js';
 import canchasRoutes from './modules/canchas/routes/canchasRoutes.js';
 import { verificarToken } from './core/middlewares/authMiddleware.js'; 
+import accessRoutes from './modules/accesses/routes/accessRoutes.js';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.use(verificarToken);
 // 2. RUTAS PROTEGIDAS
 router.use('/sedes', sedeRoutes);
 router.use('/canchas', canchasRoutes);
+router.use('/accesses', accessRoutes);
 
 
 export default router;
