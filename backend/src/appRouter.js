@@ -4,6 +4,7 @@ import sedeRoutes from './modules/sedes/routes/sedeRoutes.js';
 import canchasRoutes from './modules/canchas/routes/canchasRoutes.js';
 import { verificarToken } from './core/middlewares/authMiddleware.js'; 
 import accessRoutes from './modules/accesses/routes/accessRoutes.js';
+import paymentRoutes from './modules/payments/routes/paymentRoutes.js'; // 1. Importamos tus rutas de pagos
 
 const router = Router();
 
@@ -18,6 +19,6 @@ router.use(verificarToken);
 router.use('/sedes', sedeRoutes);
 router.use('/canchas', canchasRoutes);
 router.use('/accesses', accessRoutes);
-
+router.use('/payments', paymentRoutes); // 2. Registramos el módulo de pagos
 
 export default router;

@@ -1,6 +1,4 @@
-// backend/src/modules/accesses/dtos/access.dto.js
-
-class ValidateAccessDTO {
+export class ValidateAccessDTO {
     constructor(data) {
         this.qrCode = data.qrCode;
         this.sedeId = data.sedeId;
@@ -20,5 +18,3 @@ class ValidateAccessDTO {
         return errors;
     }
 }
-
-module.exports = { ValidateAccessDTO };
