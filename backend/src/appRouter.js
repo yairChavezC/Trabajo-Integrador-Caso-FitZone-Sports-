@@ -5,6 +5,7 @@ import canchasRoutes from './modules/canchas/routes/canchasRoutes.js';
 import { verificarToken } from './core/middlewares/authMiddleware.js'; 
 import accessRoutes from './modules/accesses/routes/accessRoutes.js';
 import paymentRoutes from './modules/payments/routes/paymentRoutes.js';
+import activityRoutes from './modules/activities/routes/activityRoutes.js';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/sedes', sedeRoutes);
 router.use('/canchas', canchasRoutes);
 router.use('/accesses', accessRoutes);
 router.use('/payments', paymentRoutes); // <-- Protegido nuevamente abajo de la barrera
+router.use('/clases', activityRoutes);
 
 export default router;
