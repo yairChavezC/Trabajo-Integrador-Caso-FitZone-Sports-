@@ -1,55 +1,98 @@
 import paymentService from '../services/paymentService.js';
 
 /**
- * Controlador para procesar un pago nuevo.
+ * POST /api/payments/pay o /api/pagos/nuevo
  */
 const createPayment = async (req, res) => {
     try {
-        const { userId, idSuscripcion, idReservaCancha, amount, concept, cardToken } = req.body;
+        const { 
+            userId, id_usuario, 
+            reservaId, reserva_id, idReservaCancha,
+            amount, monto, 
+            concept, concepto, 
+            cardToken, metodo_pago, metodoPago, 
+            moneda, idempotency_key 
+        } = req.body;
 
-        // Validación básica de entrada (defendiendo la API)
-        if (!userId || !amount || !cardToken) {
+        const targetUserId = userId || id_usuario;
+        const targetReservaId = reservaId || reserva_id || idReservaCancha;
+        const targetMonto = amount !== undefined ? amount : monto;
+        const targetMethod = cardToken || metodo_pago || metodoPago;
+
+        if (targetMonto === undefined || targetMonto === null) {
             return res.status(400).json({
                 success: false,
-                message: 'Faltan datos obligatorios (userId, amount o cardToken).'
+                message: 'Falta el monto a cobrar.'
             });
         }
 
-        // Llamamos al Service para que procese la pasarela y guarde en la BD
         const result = await paymentService.processPayment({
-            userId,
-            idSuscripcion: idSuscripcion || null,
-            idReservaCancha: idReservaCancha || null,
-            amount,
-            concept: concept || 'Pago general FitZone',
-            cardToken
+            userId: targetUserId,
+            reservaId: targetReservaId,
+            amount: targetMonto,
+            monto: targetMonto,
+            concept: concept || concepto,
+            cardToken: targetMethod,
+            metodoPago: targetMethod,
+            idempotencyKey: idempotency_key
         });
 
-        // Si la pasarela aprobó y se guardó, respondemos con 201 (Creado)
+        // Si es APROBADO o PENDIENTE -> HTTP 201
         if (result.success) {
             return res.status(201).json({
                 success: true,
                 message: result.message,
-                data: result.payment
+                data: result.data,
+                payment: result.payment
             });
         } else {
-            // Si la tarjeta fue rechazada, respondemos con 400 (Bad Request) pero la operación queda registrada
+            // Si es RECHAZADO -> HTTP 400 (pero con toda la info del comprobante devuelta)
             return res.status(400).json({
                 success: false,
                 message: result.message,
-                data: result.payment
+                data: result.data,
+                payment: result.payment
             });
         }
 
     } catch (error) {
-        console.error('Error en paymentController.createPayment:', error.message);
+        console.error('Error en paymentController.createPayment:', error);
         return res.status(500).json({
             success: false,
-            message: 'Error interno del servidor al procesar el pago.'
+            message: error.message || 'Error interno del servidor al procesar el pago.'
+        });
+    }
+};
+
+/**
+ * GET /api/pagos/por-reserva/:reserva_id
+ */
+const getByReserva = async (req, res) => {
+    try {
+        const { reserva_id } = req.params;
+        const payment = await paymentService.getPaymentByReserva(reserva_id);
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontró un pago para la reserva especificada.'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: payment
+        });
+    } catch (error) {
+        console.error('Error en getByReserva:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al consultar el pago.'
         });
     }
 };
 
 export default {
     createPayment,
+    getByReserva
 };

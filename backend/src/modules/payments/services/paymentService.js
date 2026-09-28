@@ -1,76 +1,96 @@
 import paymentRepository from '../repositories/paymentRepository.js';
 
 /**
- * Función privada para simular la pasarela de pagos (Mock).
+ * Simulación flexible de la pasarela de pagos.
  */
-const simulatePaymentGateway = async (amount, cardToken) => {
+const simulatePaymentGateway = async (amount, tokenOrMethod) => {
+    const token = String(tokenOrMethod || '').toLowerCase();
+
     return new Promise((resolve) => {
         setTimeout(() => {
-            // Si el usuario eligió explícitamente tarjeta rechazada
-            if (cardToken === 'tarjeta_rechazada') {
+            if (token.includes('rechazad')) {
                 resolve({ 
-                    status: 'REJECTED', 
-                    estado: 'RECHAZADO',
-                    message: 'El pago no pudo ser procesado por la entidad.' 
+                    estado: 'RECHAZADO', 
+                    mensaje: 'El pago fue rechazado por la entidad emisora.' 
                 });
                 return;
             }
 
-            // Si el usuario eligió transferencia pendiente
-            if (cardToken === 'transferencia_pendiente') {
+            if (token.includes('pendient')) {
                 resolve({ 
-                    status: 'PENDING', 
-                    estado: 'PENDIENTE',
-                    message: 'La operación se encuentra a la espera de acreditación.' 
+                    estado: 'PENDIENTE', 
+                    mensaje: 'La operación se encuentra a la espera de acreditación.' 
                 });
                 return;
             }
 
-            // Por defecto (tarjeta_mock u otro), se aprueba
             resolve({ 
-                status: 'APPROVED', 
-                estado: 'APROBADO',
-                message: 'Operación exitosa.' 
+                estado: 'APROBADO', 
+                mensaje: 'Operación exitosa.' 
             });
-        }, 500);
+        }, 300);
     });
 };
 
 /**
- * Procesa un intento de cobro completo.
+ * Procesa un intento de cobro y persiste en Supabase.
  */
-const processPayment = async ({ userId, idSuscripcion, idReservaCancha, amount, concept, cardToken }) => {
-    // 1. Llamamos a la pasarela simulada pasándole el cardToken
-    const gatewayResponse = await simulatePaymentGateway(amount, cardToken);
+const processPayment = async ({ userId, reservaId, amount, monto, concept, concepto, cardToken, metodoPago, idempotencyKey }) => {
+    const finalAmount = monto !== undefined ? monto : amount;
+    const finalMethod = cardToken || metodoPago || 'TARJETA';
 
-    // 2. Definimos el éxito basándonos en la respuesta de la pasarela
-    const estado = gatewayResponse.estado;
-    const success = estado !== 'RECHAZADO';
-    const message = gatewayResponse.message;
+    // 1. Simular respuesta de la pasarela
+    const gateway = await simulatePaymentGateway(finalAmount, finalMethod);
+    const success = gateway.estado !== 'RECHAZADO';
 
-    // 3. Armamos el objeto del comprobante con la información real procesada
-    const payment = {
-        id_usuario: userId,
-        monto: amount,
-        concepto: concept,
-        medio_pago: cardToken,
-        estado: estado, 
-        transaccion_externa_id: `txn_${Math.floor(Math.random() * 1000000)}`,
-        fecha_pago: new Date().toISOString()
+    // 2. Armar el objeto para DB
+    const paymentData = {
+        userId: userId || 1,
+        reservaId: reservaId || null,
+        monto: finalAmount || 0,
+        moneda: 'ARS',
+        metodoPago: finalMethod,
+        transaccionExternaId: `txn_${Date.now()}`,
+        estado: gateway.estado, // 'APROBADO', 'RECHAZADO', 'PENDIENTE'
+        idempotencyKey,
+        motivoRechazo: gateway.estado === 'RECHAZADO' ? gateway.mensaje : null
     };
 
-    // (Acá podés descomentar o integrar tu repositorio si guardás en base de datos)
-    // await paymentRepository.save(payment);
+    // 3. Persistir en la base de datos (incluso si es rechazado o pendiente queda registrado)
+    const savedPayment = await paymentRepository.createPayment(paymentData);
 
-    // 4. Devolvemos el resultado al controlador
+    // 4. Construir objeto unificado para Frontend y Orquestador
+    const paymentObj = {
+        id: savedPayment.id,
+        pago_id: savedPayment.id,
+        reserva_id: savedPayment.id_reserva_cancha,
+        id_usuario: savedPayment.id_usuario,
+        monto: savedPayment.monto,
+        medio_pago: savedPayment.medio_pago,
+        estado: savedPayment.estado,
+        transaccion_externa_id: savedPayment.transaccion_externa_id,
+        fecha_pago: savedPayment.fecha_pago,
+        fecha_creacion: savedPayment.fecha_pago,
+        mensaje: gateway.mensaje
+    };
+
     return {
         success,
-        message,
-        payment // Este es el objeto que el frontend usará para armar el comprobante
+        message: gateway.mensaje,
+        mensaje: gateway.mensaje,
+        payment: paymentObj,
+        data: paymentObj
     };
 };
 
-// Un solo export default al final del archivo
+/**
+ * Consulta estado de pago por reserva.
+ */
+const getPaymentByReserva = async (reservaId) => {
+    return await paymentRepository.getByReservaId(reservaId);
+};
+
 export default { 
-    processPayment 
+    processPayment,
+    getPaymentByReserva
 };
