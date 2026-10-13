@@ -24,12 +24,21 @@ async function getUserById(id) {
 }
 
 async function createUser(data) {
-  if (!data.nombre || !data.dni) {
-    const error = new Error('Nombre y DNI son obligatorios');
+  if (!data.nombre || !data.dni || !data.contacto || !data.password) {
+    const error = new Error('Nombre, DNI, contacto y contraseña son obligatorios');
     error.status = 400;
     throw error;
   }
-  return repository.create(data);
+  try {
+    return await repository.create(data);
+  } catch (err) {
+    if (err.code === '23505') {
+      const error = new Error('Ya existe un socio con ese DNI o contacto');
+      error.status = 409;
+      throw error;
+    }
+    throw err;
+  }
 }
 
 export default { getAllUsers, getUserById, createUser };

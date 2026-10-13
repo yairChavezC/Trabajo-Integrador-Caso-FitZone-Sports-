@@ -34,7 +34,7 @@ async function findById(id) {
 async function create({ nombre, dni, contacto, password, idRol }) {
   const result = await pool.query(
     `INSERT INTO usuario (nombre, dni, contacto, password, id_rol, activo)
-     VALUES ($1, $2, $3, $4, $5, true)
+     VALUES ($1, $2, $3, encode(digest($4, 'sha256'), 'hex'), $5, true)
      RETURNING id, nombre, dni, contacto, id_rol, activo, creado_at`,
     [nombre, dni, contacto, password, idRol]
   );

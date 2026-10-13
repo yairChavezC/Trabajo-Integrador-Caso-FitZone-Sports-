@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getMembers } from '../services/membersService';
 
 export function useMembers() {
@@ -6,12 +6,19 @@ export function useMembers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    getMembers()
-      .then(setMembers)
-      .catch(() => setError('No se pudo conectar con el backend (todavía no está disponible)'))
+  const load = useCallback(() => {
+    return getMembers()
+      .then((data) => {
+        setMembers(data);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
-  return { members, loading, error };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return { members, loading, error, reload: load };
 }

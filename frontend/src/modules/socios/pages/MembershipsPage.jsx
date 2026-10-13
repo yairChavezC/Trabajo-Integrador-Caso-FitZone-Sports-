@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMembers } from '../hooks/useMembers';
 import MemberCard from '../components/MemberCard';
+import NuevoSocioModal from '../components/NuevoSocioModal';
 import './MembershipsPage.css';
 
 function getEstado(member) {
@@ -19,9 +20,10 @@ function getEstado(member) {
 }
 
 export default function MembershipsPage() {
-  const { members, loading, error } = useMembers();
+  const { members, loading, error, reload } = useMembers();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showForm, setShowForm] = useState(false);
 
   const socios = useMemo(
     () => members.map((m) => ({ ...m, estado: getEstado(m) })),
@@ -47,7 +49,7 @@ export default function MembershipsPage() {
   });
 
   function handleNuevoSocio() {
-    // TODO: abrir el formulario de alta (usa createMember de membersService)
+    setShowForm(true);
   }
 
   return (
@@ -169,6 +171,10 @@ export default function MembershipsPage() {
 
         <div className="results-footer">{filtered.length} socios</div>
       </section>
+
+      {showForm && (
+        <NuevoSocioModal onClose={() => setShowForm(false)} onCreated={reload} />
+      )}
     </main>
   );
 }
