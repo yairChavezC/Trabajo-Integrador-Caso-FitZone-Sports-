@@ -2,37 +2,51 @@ import { useState } from 'react';
 import { accesoService } from '../services/accesoService.js';
 
 export const useAcceso = () => {
-    // Definimos los tres estados principales que pide la tarea
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [resultado, setResultado] = useState(null); 
 
-    // Esta es la función que va a llamar el botón de la interfaz
     const registrarIngresoUI = async (qrCode, sedeId) => {
-        // 1. Reiniciamos los estados y prendemos el "cargando"
         setLoading(true);
         setError(null);
         setResultado(null);
 
         try {
-            // 2. Llamamos al servicio (T06)
-            const data = await accesoService.registrarIngreso(qrCode, sedeId);
+            const res = await accesoService.registrarEscaneo(qrCode, sedeId);
             
-            // 3. Si todo sale bien, guardamos el resultado (que incluye el aforo actual)
-            setResultado(data.data); // data.data porque así lo mandamos del backend
-            return data.data; 
+            // Extraemos el payload con múltiples respaldos por si viene anidado o plano
+            let payload = res?.data?.data || res?.data || res;
+            
+            // --- BLINDAJE INTELIGENTE EN EL FRONTEND ---
+            // Si el backend no envía el tipo de acción explícitamente, lo deducimos
+            if (payload && !payload.tipoAccion) {
+                if (payload.fecha_salida || (payload.id_usuario && !payload.autorizado)) {
+                    payload = {
+                        ...payload,
+                        autorizado: true,
+                        tipoAccion: 'salida'
+                    };
+                } else if (payload.autorizado) {
+                    payload.tipoAccion = 'ingreso';
+                }
+            }
+
+            if (payload && payload.autorizado && !payload.tipoAccion) {
+                payload.tipoAccion = 'ingreso';
+            }
+
+            setResultado(payload);
+            return payload;
 
         } catch (err) {
-            // 4. Si el backend rechaza el QR (ej: cuota vencida), guardamos el error
-            setError(err);
+            const mensajeError = err.message || "Error al procesar la operación.";
+            setError(mensajeError);
             throw err; 
         } finally {
-            // 5. Pase lo que pase (éxito o error), apagamos el "cargando"
             setLoading(false);
         }
     };
 
-    // Devolvemos los estados y la función para que las pantallas los puedan usar
     return {
         loading,
         error,
