@@ -13,7 +13,8 @@ class AccessService {
             }
 
             // 2. RF-02 / RF-04: Verificar que la membresía esté Activa
-            if (usuario.estado_membresia !== 'Activo') {
+            const estadoMembresia = usuario.estado_membresia || usuario.estadoMembresia;
+            if (estadoMembresia !== 'Activo' && estadoMembresia !== 'ACTIVO') {
                 throw new Error('El usuario no tiene una membresía activa.');
             }
 
@@ -24,10 +25,13 @@ class AccessService {
             }
 
             // 4. Todo en orden: Registramos el ingreso en la base de datos
-            const registro = await accessRepository.registrarIngreso(usuario.id, sedeId);
+            const registro = await accessRepository.createAccess({ idSede: sedeId, idUserId: usuario.id });
 
             // 5. RF-05: Calculamos el aforo actual para mandarlo a la pantalla de la recepcionista
-            const aforoActual = await accessRepository.getAforoActual(sedeId);
+            let aforoActual = 0;
+            if (typeof accessRepository.getAforoActual === 'function') {
+                aforoActual = await accessRepository.getAforoActual(sedeId);
+            }
 
             // Retornamos un objeto con los datos exitosos
             return {
@@ -35,7 +39,7 @@ class AccessService {
                 mensaje: 'Ingreso exitoso',
                 usuarioId: usuario.id,
                 aforoActual: aforoActual,
-                horaIngreso: registro.hora_ingreso
+                horaIngreso: registro.fecha_entrada
             };
 
         } catch (error) {
@@ -46,6 +50,40 @@ class AccessService {
             };
         }
     }
+
+    // NUEVA FUNCIÓN: Procesar la salida del socio
+    async procesarSalida(idUserId, sedeId) {
+        try {
+            // Llamamos a la nueva función del repositorio
+            const salida = await accessRepository.registrarSalida(idUserId, sedeId);
+
+            if (!salida) {
+                return {
+                    autorizado: false,
+                    mensaje: "El usuario no registra un ingreso activo en esta sede."
+                };
+            }
+
+            // Calculamos el nuevo aforo para que baje el numerito en pantalla
+            let aforoActual = 0;
+            if (typeof accessRepository.getAforoActual === 'function') {
+                aforoActual = await accessRepository.getAforoActual(sedeId);
+            }
+
+            return {
+                autorizado: true,
+                mensaje: "Salida registrada correctamente. Aforo liberado.",
+                aforoActual: aforoActual,
+                data: salida
+            };
+        } catch (error) {
+            return {
+                autorizado: false,
+                mensaje: "Error al procesar la salida: " + error.message
+            };
+        }
+    }
+    
 }
 
 export default new AccessService();

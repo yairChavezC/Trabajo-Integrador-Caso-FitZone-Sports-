@@ -24,8 +24,24 @@ const getAllAccesses = async () => {
     return result.rows;
 };
 
+/**
+ * Registra la salida de un usuario (Actualiza la fecha_salida en su último acceso sin salida).
+ */
+const registrarSalida = async (idUserId, idSede) => {
+    const query = `
+        UPDATE control_acceso 
+        SET fecha_salida = $1 
+        WHERE id_usuario = $2 AND id_sede = $3 AND fecha_salida IS NULL 
+        RETURNING *;
+    `;
+    const values = [new Date(), idUserId, idSede];
+    const result = await pool.query(query, values);
+    return result.rows[0]; 
+};
+
 // Exportación por defecto que espera el service
 export default {
     createAccess,
     getAllAccesses,
+    registrarSalida, 
 };

@@ -36,13 +36,47 @@ class AccessController {
             });
 
         } catch (error) {
-            // Si hay un error grave (ej: se cayó la base de datos)
-            console.error('Error en AccessController:', error);
-            // Nota: Si en core/middlewares tienen un manejador global de errores, 
-            // acá en lugar de res.status(500) harías un `next(error)`
+            console.error('Error en AccessController (Ingreso):', error);
             return res.status(500).json({
                 success: false,
                 mensaje: 'Error interno del servidor al procesar el ingreso.'
+            });
+        }
+    }
+
+    // NUEVO: Método que maneja la petición POST de una salida
+    async registrarSalida(req, res) {
+        try {
+            // Recibimos los datos básicos para registrar salida
+            const { idUserId, sedeId } = req.body;
+
+            if (!idUserId || !sedeId) {
+                return res.status(400).json({
+                    success: false,
+                    mensaje: 'Faltan datos obligatorios para registrar la salida (idUserId o sedeId).'
+                });
+            }
+
+            // Llamamos al nuevo método del servicio
+            const resultado = await accessService.procesarSalida(idUserId, sedeId);
+
+            if (!resultado.autorizado) {
+                return res.status(400).json({ 
+                    success: false,
+                    mensaje: resultado.mensaje
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: resultado
+            });
+
+        } catch (error) {
+            console.error('Error en AccessController (Salida):', error);
+            return res.status(500).json({
+                success: false,
+                mensaje: 'Error interno del servidor al procesar la salida.'
             });
         }
     }
