@@ -391,3 +391,21 @@
   .search-field { width: 100%; }
   .membership-filter { justify-content: space-between; }
 }
+
+/* Fila de socio clickeable */
+
+a.member-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.member-card:hover {
+  background: #f8f9fc;
+}
+
+.member-card-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--fz-muted);
+}

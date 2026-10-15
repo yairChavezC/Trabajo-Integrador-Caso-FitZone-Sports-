@@ -18,5 +18,9 @@ export function toUserResponseDTO(user) {
     contacto: user.contacto,
     activo: user.activo,
     enMora: user.enMora,
+    estadoSuscripcion: user.estado_suscripcion ?? null,
+    fechaProximoVencimiento: user.fecha_proximo_vencimiento ?? null,
+    descuento: user.descuento ?? null,
+    creadoAt: user.creado_at ?? null,
   };
 }

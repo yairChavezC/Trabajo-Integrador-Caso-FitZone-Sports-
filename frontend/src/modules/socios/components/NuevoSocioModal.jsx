@@ -4,6 +4,7 @@ import { createMember } from '../services/membersService';
 import './NuevoSocioModal.css';
 
 const INITIAL = { nombre: '', dni: '', contacto: '', password: '' };
+const ROL_SOCIO = 3; // id del rol "socio" en la tabla rol
 
 export default function NuevoSocioModal({ onClose, onCreated }) {
   const [form, setForm] = useState(INITIAL);
@@ -24,6 +25,7 @@ export default function NuevoSocioModal({ onClose, onCreated }) {
         dni: form.dni.trim(),
         contacto: form.contacto.trim(),
         password: form.password,
+        idRol: ROL_SOCIO,
       });
       await onCreated();
       onClose();
