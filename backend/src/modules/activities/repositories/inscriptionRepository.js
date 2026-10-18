@@ -24,26 +24,13 @@ export const withTransaction = async (work) => {
   }
 };
 
-export const countOccupied = async (idClase, client = pool) => {
+export const countConfirmed = async (idClase, client = pool) => {
   const { rows } = await client.query(
     `
       SELECT COUNT(*)::int AS total
       FROM public.inscripciones_clase_grupal
       WHERE id_clase_grupal = $1
-        AND estado IN ('confirmado', 'notificado')
-    `,
-    [idClase]
-  );
-  return rows[0].total;
-};
-
-export const countWaitlist = async (idClase, client = pool) => {
-  const { rows } = await client.query(
-    `
-      SELECT COUNT(*)::int AS total
-      FROM public.inscripciones_clase_grupal
-      WHERE id_clase_grupal = $1
-        AND estado = 'en espera'
+        AND estado = 'confirmado'
     `,
     [idClase]
   );
@@ -58,7 +45,7 @@ export const findActiveByUserAndClass = async (idClase, idUsuario, client = pool
       WHERE id_clase_grupal = $1
         AND id_usuario = $2
         AND estado IN ('confirmado', 'en espera', 'notificado')
-      ORDER BY fecha_registro DESC
+      ORDER BY fecha_registro DESC, id DESC
       LIMIT 1
     `,
     [idClase, idUsuario]
@@ -103,7 +90,7 @@ export const findNextWaitlist = async (idClase, client = pool) => {
       FROM public.inscripciones_clase_grupal
       WHERE id_clase_grupal = $1
         AND estado = 'en espera'
-      ORDER BY fecha_registro ASC
+      ORDER BY fecha_registro ASC, id ASC
       LIMIT 1
     `,
     [idClase]
@@ -111,28 +98,13 @@ export const findNextWaitlist = async (idClase, client = pool) => {
   return rows[0] ?? null;
 };
 
-export const notifyWaitlistInscription = async (id, client = pool) => {
-  const { rows } = await client.query(
-    `
-      UPDATE public.inscripciones_clase_grupal
-      SET
-        estado = 'notificado',
-        fecha_expiracion_oferta = NOW() + INTERVAL '2 hours'
-      WHERE id = $1
-      RETURNING ${inscriptionSelect}
-    `,
-    [id]
-  );
-  return rows[0] ?? null;
-};
-
-export const confirmOfferedInscription = async (id, client = pool) => {
+export const promoteWaitlistInscription = async (id, client = pool) => {
   const { rows } = await client.query(
     `
       UPDATE public.inscripciones_clase_grupal
       SET
         estado = 'confirmado',
-        fecha_expiracion_oferta = NULL
+        fecha_expiracion_oferta = NOW() + INTERVAL '2 hours'
       WHERE id = $1
       RETURNING ${inscriptionSelect}
     `,

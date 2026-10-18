@@ -1,6 +1,6 @@
 import pool from '../../../config/db.js';
 
-const classSelect = `
+const classColumns = `
   id,
   id_sede AS "idSede",
   nombre,
@@ -10,16 +10,57 @@ const classSelect = `
   fecha_fin AS "fechaFin"
 `;
 
-export const findAllActivities = async () => {
+const classSelect = `
+  c.id,
+  c.id_sede AS "idSede",
+  c.nombre,
+  c.profesor,
+  c.cupo,
+  c.fecha_inicio AS "fechaInicio",
+  c.fecha_fin AS "fechaFin",
+  COALESCE(inscriptos.confirmados, 0)::int AS "inscriptosConfirmados",
+  GREATEST(c.cupo - COALESCE(inscriptos.confirmados, 0), 0)::int AS "cupoDisponible",
+  mi.inscripcion AS "miInscripcion"
+`;
+
+const activityJoins = `
+  LEFT JOIN (
+    SELECT
+      id_clase_grupal,
+      COUNT(*) AS confirmados
+    FROM public.inscripciones_clase_grupal
+    WHERE estado = 'confirmado'
+    GROUP BY id_clase_grupal
+  ) inscriptos ON inscriptos.id_clase_grupal = c.id
+  LEFT JOIN LATERAL (
+    SELECT jsonb_build_object(
+      'id', i.id,
+      'idClase', i.id_clase_grupal,
+      'idUsuario', i.id_usuario,
+      'estado', i.estado,
+      'fechaRegistro', i.fecha_registro,
+      'fechaExpiracionOferta', i.fecha_expiracion_oferta
+    ) AS inscripcion
+    FROM public.inscripciones_clase_grupal i
+    WHERE i.id_clase_grupal = c.id
+      AND i.id_usuario = $1
+      AND i.estado IN ('confirmado', 'en espera', 'notificado')
+    ORDER BY i.fecha_registro DESC, i.id DESC
+    LIMIT 1
+  ) mi ON TRUE
+`;
+
+export const findAllActivities = async (idUsuario = null) => {
   const query = `
     SELECT
       ${classSelect}
-    FROM public.clase_grupal
-    ORDER BY fecha_inicio ASC;
+    FROM public.clase_grupal c
+    ${activityJoins}
+    ORDER BY c.fecha_inicio ASC;
   `;
 
   try {
-    const { rows } = await pool.query(query);
+    const { rows } = await pool.query(query, [idUsuario]);
     return rows;
   } catch (error) {
     console.error('Error en activityRepository.findAllActivities:', error);
@@ -27,20 +68,45 @@ export const findAllActivities = async () => {
   }
 };
 
-export const findActivityById = async (id) => {
+export const findActivityById = async (id, idUsuario = null, client = pool) => {
   const query = `
     SELECT
       ${classSelect}
-    FROM public.clase_grupal
-    WHERE id = $1
+    FROM public.clase_grupal c
+    ${activityJoins}
+    WHERE c.id = $2
     LIMIT 1;
   `;
 
   try {
-    const { rows } = await pool.query(query, [id]);
+    const { rows } = await client.query(query, [idUsuario, id]);
     return rows[0];
   } catch (error) {
     console.error('Error en activityRepository.findActivityById:', error);
+    throw error;
+  }
+};
+
+export const lockActivityById = async (id, client) => {
+  const query = `
+    SELECT
+      c.id,
+      c.id_sede AS "idSede",
+      c.nombre,
+      c.profesor,
+      c.cupo,
+      c.fecha_inicio AS "fechaInicio",
+      c.fecha_fin AS "fechaFin"
+    FROM public.clase_grupal c
+    WHERE c.id = $1
+    FOR UPDATE;
+  `;
+
+  try {
+    const { rows } = await client.query(query, [id]);
+    return rows[0];
+  } catch (error) {
+    console.error('Error en activityRepository.lockActivityById:', error);
     throw error;
   }
 };
@@ -57,7 +123,7 @@ export const createActivity = async (dto) => {
     )
     VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING
-      ${classSelect};
+      ${classColumns};
   `;
 
   const values = [
@@ -78,7 +144,7 @@ export const createActivity = async (dto) => {
   }
 };
 
-export const updateActivity = async (id, dto) => {
+export const updateActivity = async (id, dto, client = pool) => {
   const query = `
     UPDATE public.clase_grupal
     SET
@@ -90,7 +156,7 @@ export const updateActivity = async (id, dto) => {
       fecha_fin = $6
     WHERE id = $7
     RETURNING
-      ${classSelect};
+      ${classColumns};
   `;
 
   const values = [
@@ -104,7 +170,7 @@ export const updateActivity = async (id, dto) => {
   ];
 
   try {
-    const { rows } = await pool.query(query, values);
+    const { rows } = await client.query(query, values);
     return rows[0];
   } catch (error) {
     console.error('Error en activityRepository.updateActivity:', error);
@@ -117,7 +183,7 @@ export const deleteActivity = async (id) => {
     DELETE FROM public.clase_grupal
     WHERE id = $1
     RETURNING
-      ${classSelect};
+      ${classColumns};
   `;
 
   try {

@@ -24,7 +24,7 @@ export class WaitlistSubject {
 export class ConsoleWaitlistObserver {
   async update(evento) {
     console.log(
-      `[Observer/ListaEspera] Clase ${evento.idClase}: se notificó al usuario ${evento.idUsuario} ` +
+      `[Observer/ListaEspera] Clase ${evento.idClase}: se generó una notificación para el usuario ${evento.idUsuario} ` +
         `(inscripción ${evento.idInscripcion}). Motivo: ${evento.motivo}`
     );
   }

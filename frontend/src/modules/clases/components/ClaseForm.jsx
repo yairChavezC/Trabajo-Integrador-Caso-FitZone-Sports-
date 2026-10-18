@@ -1,4 +1,12 @@
-export default function ClaseForm({ formData, setFormData, onSubmit, isEditing, sedes = [] }) {
+export default function ClaseForm({
+  formData,
+  setFormData,
+  onSubmit,
+  isEditing,
+  sedes = [],
+  guardando = false,
+  onCancel
+}) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -30,6 +38,8 @@ export default function ClaseForm({ formData, setFormData, onSubmit, isEditing, 
           name="nombre"
           value={formData.nombre}
           placeholder="Spinning, Yoga, Funcional..."
+          minLength="3"
+          maxLength="100"
           onChange={handleChange}
           required
         />
@@ -42,6 +52,8 @@ export default function ClaseForm({ formData, setFormData, onSubmit, isEditing, 
           name="profesor"
           value={formData.profesor}
           placeholder="Nombre del profesor"
+          minLength="3"
+          maxLength="150"
           onChange={handleChange}
           required
         />
@@ -53,8 +65,9 @@ export default function ClaseForm({ formData, setFormData, onSubmit, isEditing, 
           type="number"
           name="cupo"
           min="1"
+          step="1"
           value={formData.cupo}
-          placeholder="12"
+          placeholder="20"
           onChange={handleChange}
           required
         />
@@ -82,7 +95,16 @@ export default function ClaseForm({ formData, setFormData, onSubmit, isEditing, 
         />
       </label>
 
-      <button type="submit">{isEditing ? 'Guardar cambios' : 'Crear clase'}</button>
+      <div className="clase-form-actions">
+        <button type="submit" disabled={guardando}>
+          {guardando ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Crear clase'}
+        </button>
+        {isEditing && (
+          <button type="button" className="btn-secondary" onClick={onCancel}>
+            Dejar de editar
+          </button>
+        )}
+      </div>
     </form>
   );
 }

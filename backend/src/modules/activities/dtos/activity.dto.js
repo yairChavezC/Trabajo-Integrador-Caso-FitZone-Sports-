@@ -11,16 +11,17 @@ export class CreateActivityDTO {
     validate() {
         const errors = [];
 
-        if (!this.idSede || Number.isNaN(Number(this.idSede))) {
-            errors.push('El ID de la sede es obligatorio y debe ser numérico.');
+        const idSede = Number(this.idSede);
+        if (!Number.isInteger(idSede) || idSede <= 0) {
+            errors.push('El ID de la sede es obligatorio y debe ser un entero mayor a 0.');
         }
 
-        if (!this.nombre || this.nombre.length < 3) {
-            errors.push('El nombre de la clase es obligatorio y debe tener al menos 3 caracteres.');
+        if (!this.nombre || this.nombre.length < 3 || this.nombre.length > 100) {
+            errors.push('El nombre de la clase debe tener entre 3 y 100 caracteres.');
         }
 
-        if (!this.profesor || this.profesor.length < 3) {
-            errors.push('El profesor es obligatorio y debe tener al menos 3 caracteres.');
+        if (!this.profesor || this.profesor.length < 3 || this.profesor.length > 150) {
+            errors.push('El profesor debe tener entre 3 y 150 caracteres.');
         }
 
         if (!Number.isInteger(this.cupo) || this.cupo <= 0) {

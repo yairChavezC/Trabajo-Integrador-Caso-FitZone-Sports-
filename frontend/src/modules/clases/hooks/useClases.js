@@ -7,7 +7,9 @@ import {
   deleteClase,
   reservarClase,
   cancelarReservaClase,
-  anotarListaEspera
+  anotarListaEspera,
+  getNotificacionesClases,
+  marcarNotificacionClaseLeida
 } from '../services/claseService';
 
 const unwrap = (payload) => payload?.data ?? payload;
@@ -18,18 +20,31 @@ export const useClases = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [notificationError, setNotificationError] = useState(null);
 
-  const fetchClases = useCallback(async () => {
+  const fetchClases = useCallback(async ({ showLoading = true } = {}) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const data = await getClases();
       const lista = Array.isArray(data) ? data : data.data ?? [];
+
       setClases(lista);
       setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+    }
+  }, []);
+
+  const fetchNotificaciones = useCallback(async () => {
+    try {
+      const data = await getNotificacionesClases();
+      setNotificaciones(Array.isArray(data) ? data : data.data ?? []);
+      setNotificationError(null);
+    } catch (err) {
+      setNotificationError(err.message);
     }
   }, []);
 
@@ -37,47 +52,54 @@ export const useClases = () => {
     fetchClases();
   }, [fetchClases]);
 
+  useEffect(() => {
+    fetchNotificaciones();
+    const intervalId = window.setInterval(() => {
+      fetchNotificaciones();
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchNotificaciones]);
+
   const clasesDeSede = sedeSeleccionada
     ? clases.filter((clase) => Number(clase.idSede) === Number(sedeSeleccionada.id))
     : clases;
 
-  const addClase = async (payload) => {
-    const created = unwrap(await createClase(payload));
-    await fetchClases();
-    return created;
-  };
-
-  const editClase = async (id, payload) => {
-    const result = unwrap(await updateClase(id, payload));
-    await fetchClases();
-    return result;
-  };
-
-  const removeClase = async (id) => {
-    await deleteClase(id);
-    await fetchClases();
-  };
-
-  const runSocioAction = async (action) => {
+  const runAction = async (action) => {
     try {
       setActionError(null);
-      await action();
+      const result = await action();
       await fetchClases();
+      return unwrap(result) ?? true;
     } catch (err) {
       setActionError(err.message);
-      throw err;
+      return null;
     }
   };
 
-  const reservar = (id) => runSocioAction(() => reservarClase(id));
-  const cancelar = (id) => runSocioAction(() => cancelarReservaClase(id));
-  const listaEspera = (id) => runSocioAction(() => anotarListaEspera(id));
+  const addClase = (payload) => runAction(() => createClase(payload));
+  const editClase = (id, payload) => runAction(() => updateClase(id, payload));
+  const removeClase = (id) => runAction(() => deleteClase(id));
+  const reservar = (id) => runAction(() => reservarClase(id));
+  const cancelar = (id) => runAction(() => cancelarReservaClase(id));
+  const listaEspera = (id) => runAction(() => anotarListaEspera(id));
+  const marcarNotificacionLeida = async (id) => {
+    try {
+      await marcarNotificacionClaseLeida(id);
+      await fetchNotificaciones();
+    } catch (err) {
+      setNotificationError(err.message);
+    }
+  };
 
   return {
     clases: clasesDeSede,
     loading,
     error,
     actionError,
+    notificaciones,
+    notificationError,
+    marcarNotificacionLeida,
     fetchClases,
     addClase,
     editClase,

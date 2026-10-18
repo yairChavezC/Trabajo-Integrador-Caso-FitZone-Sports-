@@ -31,3 +31,11 @@ export const cancelarReservaClase = async (id) => {
 export const anotarListaEspera = async (id) => {
   return httpClient.post(`/clases/${id}/lista-espera`);
 };
+
+export const getNotificacionesClases = async () => {
+  return httpClient.get('/clases/notificaciones');
+};
+
+export const marcarNotificacionClaseLeida = async (id) => {
+  return httpClient.put(`/clases/notificaciones/${id}/leida`);
+};

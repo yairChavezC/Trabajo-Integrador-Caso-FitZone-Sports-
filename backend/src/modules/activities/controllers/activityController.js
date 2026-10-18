@@ -7,13 +7,15 @@ import {
   reserveClass,
   joinWaitlist,
   cancelClassReservation,
-  confirmWaitlistOffer,
-  rejectWaitlistOffer,
   getInscriptionsByClass
 } from '../services/activityService.js';
 
 import { CreateActivityDTO } from '../dtos/activity.dto.js';
 import { BusinessError } from '../errors.js';
+import {
+  getClassNotifications,
+  markClassNotificationAsRead
+} from '../services/notificationService.js';
 
 const handleError = (res, error, fallbackMessage) => {
   if (error instanceof BusinessError) {
@@ -54,11 +56,7 @@ export const getActivityById = async (req, res) => {
 
     return res.status(200).json(activity);
   } catch (error) {
-    console.error('Error al obtener la clase:', error);
-    return res.status(500).json({
-      message: 'Error interno del servidor',
-      error: error.message
-    });
+    return handleError(res, error, 'Error al obtener la clase:');
   }
 };
 
@@ -77,16 +75,13 @@ export const createActivity = async (req, res) => {
 
     const newActivity = await createActivityService(dto);
 
+    res.location(`/clases/${newActivity.id}`);
     return res.status(201).json({
       message: 'Clase creada correctamente',
       data: newActivity
     });
   } catch (error) {
-    console.error('Error al crear la clase:', error);
-    return res.status(500).json({
-      message: 'Error interno del servidor',
-      error: error.message
-    });
+    return handleError(res, error, 'Error al crear la clase:');
   }
 };
 
@@ -120,11 +115,7 @@ export const updateActivity = async (req, res) => {
       data: updatedActivity
     });
   } catch (error) {
-    console.error('Error al actualizar la clase:', error);
-    return res.status(500).json({
-      message: 'Error interno del servidor',
-      error: error.message
-    });
+    return handleError(res, error, 'Error al actualizar la clase:');
   }
 };
 
@@ -147,11 +138,7 @@ export const deleteActivity = async (req, res) => {
       data: deletedActivity
     });
   } catch (error) {
-    console.error('Error al eliminar la clase:', error);
-    return res.status(500).json({
-      message: 'Error interno del servidor',
-      error: error.message
-    });
+    return handleError(res, error, 'Error al eliminar la clase:');
   }
 };
 
@@ -206,40 +193,6 @@ export const deleteReservation = async (req, res) => {
   }
 };
 
-export const postConfirmOffer = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: 'El ID de la clase es inválido.' });
-    }
-
-    const inscription = await confirmWaitlistOffer(id, getUserId(req));
-    return res.status(200).json({
-      message: 'Lugar confirmado',
-      data: inscription
-    });
-  } catch (error) {
-    return handleError(res, error, 'Error al confirmar el cupo:');
-  }
-};
-
-export const postRejectOffer = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: 'El ID de la clase es inválido.' });
-    }
-
-    const result = await rejectWaitlistOffer(id, getUserId(req));
-    return res.status(200).json({
-      message: 'Oferta rechazada',
-      data: result
-    });
-  } catch (error) {
-    return handleError(res, error, 'Error al rechazar el cupo:');
-  }
-};
-
 export const getClassInscriptions = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -251,5 +204,28 @@ export const getClassInscriptions = async (req, res) => {
     return res.status(200).json(inscriptions);
   } catch (error) {
     return handleError(res, error, 'Error al listar inscripciones:');
+  }
+};
+
+export const getNotifications = async (req, res) => {
+  try {
+    const notifications = await getClassNotifications(getUserId(req));
+    return res.status(200).json(notifications);
+  } catch (error) {
+    return handleError(res, error, 'Error al obtener las notificaciones:');
+  }
+};
+
+export const readNotification = async (req, res) => {
+  try {
+    const id = Number(req.params.notificationId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: 'El ID de la notificación es inválido.' });
+    }
+
+    const notification = await markClassNotificationAsRead(id, getUserId(req));
+    return res.status(200).json(notification);
+  } catch (error) {
+    return handleError(res, error, 'Error al actualizar la notificación:');
   }
 };

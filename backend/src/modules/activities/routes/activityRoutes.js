@@ -8,23 +8,30 @@ import {
   postReservation,
   postWaitlist,
   deleteReservation,
-  postConfirmOffer,
-  postRejectOffer,
-  getClassInscriptions
+  getClassInscriptions,
+  getNotifications,
+  readNotification
 } from '../controllers/activityController.js';
 
 const router = express.Router();
 
+const requireAdministrator = (req, res, next) => {
+  if (Number(req.usuario?.rol) !== 1) {
+    return res.status(403).json({ message: 'Se requiere rol de administrador.' });
+  }
+  return next();
+};
+
 router.get('/', getActivities);
-router.post('/', createActivity);
-router.get('/:id/inscripciones', getClassInscriptions);
+router.get('/notificaciones', getNotifications);
+router.put('/notificaciones/:notificationId/leida', readNotification);
+router.post('/', requireAdministrator, createActivity);
+router.get('/:id/inscripciones', requireAdministrator, getClassInscriptions);
 router.post('/:id/reservas', postReservation);
 router.delete('/:id/reservas', deleteReservation);
 router.post('/:id/lista-espera', postWaitlist);
-router.post('/:id/oferta/confirmar', postConfirmOffer);
-router.post('/:id/oferta/rechazar', postRejectOffer);
 router.get('/:id', getActivityById);
-router.put('/:id', updateActivity);
-router.delete('/:id', deleteActivity);
+router.put('/:id', requireAdministrator, updateActivity);
+router.delete('/:id', requireAdministrator, deleteActivity);
 
 export default router;
