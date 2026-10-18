@@ -1,82 +1,33 @@
-const API_URL = 'http://localhost:3000/api';
-
-const getToken = () => localStorage.getItem('token');
-
-const buildHeaders = (body = null) => {
-  const headers = {
-    Authorization: `Bearer ${getToken()}`
-  };
-
-  if (body) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  return headers;
-};
+import { httpClient } from '../../../core/api/httpClient';
 
 export const getClases = async () => {
-  const res = await fetch(`${API_URL}/clases`, {
-    method: 'GET',
-    headers: buildHeaders()
-  });
-
-  if (!res.ok) {
-    throw new Error('No se pudieron obtener las clases');
-  }
-
-  return res.json();
+  return httpClient.get('/clases');
 };
 
 export const getClaseById = async (id) => {
-  const res = await fetch(`${API_URL}/clases/${id}`, {
-    method: 'GET',
-    headers: buildHeaders()
-  });
-
-  if (!res.ok) {
-    throw new Error('No se pudo obtener la clase');
-  }
-
-  return res.json();
+  return httpClient.get(`/clases/${id}`);
 };
 
 export const createClase = async (payload) => {
-  const res = await fetch(`${API_URL}/clases`, {
-    method: 'POST',
-    headers: buildHeaders(payload),
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    throw new Error('No se pudo crear la clase');
-  }
-
-  return res.json();
+  return httpClient.post('/clases', payload);
 };
 
 export const updateClase = async (id, payload) => {
-  const res = await fetch(`${API_URL}/clases/${id}`, {
-    method: 'PUT',
-    headers: buildHeaders(payload),
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    throw new Error('No se pudo actualizar la clase');
-  }
-
-  return res.json();
+  return httpClient.put(`/clases/${id}`, payload);
 };
 
 export const deleteClase = async (id) => {
-  const res = await fetch(`${API_URL}/clases/${id}`, {
-    method: 'DELETE',
-    headers: buildHeaders()
-  });
+  return httpClient.delete(`/clases/${id}`);
+};
 
-  if (!res.ok) {
-    throw new Error('No se pudo eliminar la clase');
-  }
+export const reservarClase = async (id) => {
+  return httpClient.post(`/clases/${id}/reservas`);
+};
 
-  return res.json();
+export const cancelarReservaClase = async (id) => {
+  return httpClient.delete(`/clases/${id}/reservas`);
+};
+
+export const anotarListaEspera = async (id) => {
+  return httpClient.post(`/clases/${id}/lista-espera`);
 };

@@ -1,42 +1,69 @@
-export default function ClaseTable({ clases, onDelete, onEdit }) {
+function estadoLabel(inscripcion) {
+  if (!inscripcion) return 'Sin inscripción';
+  if (inscripcion.estado === 'confirmado') return 'Reservada';
+  if (inscripcion.estado === 'en espera') return 'En lista de espera';
+  if (inscripcion.estado === 'notificado') return 'Cupo liberado';
+  return inscripcion.estado;
+}
+
+export default function ClaseTable({
+  clases,
+  onDelete,
+  onEdit,
+  onReservar,
+  onCancelar,
+  onListaEspera
+}) {
   if (!clases.length) {
-    return <p>No hay clases cargadas.</p>;
+    return <p className="clases-empty">No hay clases cargadas para esta sede.</p>;
   }
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Nombre</th>
-          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Profesor</th>
-          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Cupo</th>
-          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Inicio</th>
-          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Fin</th>
-          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Acciones</th>
-        </tr>
-      </thead>
+    <div className="clases-grid">
+      {clases.map((clase) => {
+        const llena = Number(clase.cupoDisponible) <= 0;
+        const mia = clase.miInscripcion;
 
-      <tbody>
-        {clases.map((clase) => (
-          <tr key={clase.id}>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>{clase.nombre}</td>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>{clase.profesor}</td>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>{clase.cupo}</td>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-              {new Date(clase.fechaInicio).toLocaleString()}
-            </td>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-              {new Date(clase.fechaFin).toLocaleString()}
-            </td>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-              <button onClick={() => onEdit(clase)} style={{ marginRight: '8px' }}>
+        return (
+          <article key={clase.id} className="clase-card">
+            <span className="clase-chip">{clase.nombre}</span>
+            <h3>{clase.profesor}</h3>
+            <p>
+              {new Date(clase.fechaInicio).toLocaleString()} —{' '}
+              {new Date(clase.fechaFin).toLocaleTimeString()}
+            </p>
+            <p>
+              Cupo {clase.inscriptosConfirmados ?? 0}/{clase.cupo} · disponibles:{' '}
+              {clase.cupoDisponible ?? clase.cupo}
+            </p>
+            <p className="clase-estado">{estadoLabel(mia)}</p>
+
+            <div className="clase-actions">
+              {!mia && !llena && (
+                <button type="button" onClick={() => onReservar(clase.id)}>
+                  Reservar
+                </button>
+              )}
+              {!mia && llena && (
+                <button type="button" onClick={() => onListaEspera(clase.id)}>
+                  Lista de espera
+                </button>
+              )}
+              {mia && (
+                <button type="button" onClick={() => onCancelar(clase.id)}>
+                  Cancelar
+                </button>
+              )}
+              <button type="button" className="btn-secondary" onClick={() => onEdit(clase)}>
                 Editar
               </button>
-              <button onClick={() => onDelete(clase.id)}>Eliminar</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+              <button type="button" className="btn-danger" onClick={() => onDelete(clase.id)}>
+                Eliminar
+              </button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
   );
 }

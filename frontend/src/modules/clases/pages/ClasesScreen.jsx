@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useClases } from '../hooks/useClases';
+import { useSede } from '../../../shared/context/SedeContext';
 import ClaseForm from '../components/ClaseForm';
 import ClaseTable from '../components/ClaseTable';
+import './ClasesScreen.css';
 
 const initialForm = {
   idSede: '',
@@ -13,18 +15,38 @@ const initialForm = {
 };
 
 export default function ClasesScreen() {
-  const { clases, loading, error, addClase, editClase, removeClase } = useClases();
-  const [formData, setFormData] = useState(initialForm);
+  const { sedes, sedeSeleccionada } = useSede();
+  const {
+    clases,
+    loading,
+    error,
+    actionError,
+    addClase,
+    editClase,
+    removeClase,
+    reservar,
+    cancelar,
+    listaEspera
+  } = useClases();
+  const [formData, setFormData] = useState({
+    ...initialForm,
+    idSede: sedeSeleccionada?.id ? String(sedeSeleccionada.id) : ''
+  });
   const [editingId, setEditingId] = useState(null);
 
   const resetForm = () => {
-    setFormData(initialForm);
+    setFormData({
+      ...initialForm,
+      idSede: sedeSeleccionada?.id ? String(sedeSeleccionada.id) : ''
+    });
     setEditingId(null);
   };
 
   const formatForInput = (date) => {
     if (!date) return '';
-    return new Date(date).toISOString().slice(0, 16);
+    const local = new Date(date);
+    const offset = local.getTimezoneOffset();
+    return new Date(local.getTime() - offset * 60000).toISOString().slice(0, 16);
   };
 
   const handleSubmit = async (e) => {
@@ -60,24 +82,36 @@ export default function ClasesScreen() {
     });
   };
 
-  if (loading) return <p>Cargando clases...</p>;
-  if (error) return <p>Error: {error}</p>;
+  if (loading) return <p className="clases-empty">Cargando clases...</p>;
+  if (error) return <p className="clases-alert">Error: {error}</p>;
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h2>Clases grupales</h2>
+    <div className="clases-container">
+      <div className="clases-header">
+        <h2>Clases grupales</h2>
+        <p>
+          Programá la agenda de la sede y reservá cupo. La reserva pide 48 h de anticipación
+          y la cancelación se habilita hasta 2 h antes. Si la clase está llena, entra lista de espera.
+        </p>
+      </div>
+
+      {actionError && <div className="clases-alert">{actionError}</div>}
 
       <ClaseForm
         formData={formData}
         setFormData={setFormData}
         onSubmit={handleSubmit}
         isEditing={!!editingId}
+        sedes={sedes}
       />
 
       <ClaseTable
         clases={clases}
         onDelete={removeClase}
         onEdit={handleEdit}
+        onReservar={reservar}
+        onCancelar={cancelar}
+        onListaEspera={listaEspera}
       />
     </div>
   );

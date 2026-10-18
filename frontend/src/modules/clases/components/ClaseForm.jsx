@@ -1,7 +1,6 @@
-export default function ClaseForm({ formData, setFormData, onSubmit, isEditing }) {
+export default function ClaseForm({ formData, setFormData, onSubmit, isEditing, sedes = [] }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: value
@@ -9,64 +8,81 @@ export default function ClaseForm({ formData, setFormData, onSubmit, isEditing }
   };
 
   return (
-    <form
-      onSubmit={onSubmit}
-      style={{
-        display: 'grid',
-        gap: '12px',
-        maxWidth: '500px',
-        marginBottom: '2rem'
-      }}
-    >
-      <input
-        type="number"
-        name="idSede"
-        value={formData.idSede}
-        placeholder="ID de sede"
-        onChange={handleChange}
-      />
+    <form className="clase-form" onSubmit={onSubmit}>
+      <h3>{isEditing ? 'Editar clase' : 'Programar clase'}</h3>
 
-      <input
-        type="text"
-        name="nombre"
-        value={formData.nombre}
-        placeholder="Nombre de la clase"
-        onChange={handleChange}
-      />
+      <label>
+        Sede
+        <select name="idSede" value={formData.idSede} onChange={handleChange} required>
+          <option value="">Elegí una sede</option>
+          {sedes.map((sede) => (
+            <option key={sede.id} value={sede.id}>
+              {sede.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
 
-      <input
-        type="text"
-        name="profesor"
-        value={formData.profesor}
-        placeholder="Profesor"
-        onChange={handleChange}
-      />
+      <label>
+        Disciplina / nombre
+        <input
+          type="text"
+          name="nombre"
+          value={formData.nombre}
+          placeholder="Spinning, Yoga, Funcional..."
+          onChange={handleChange}
+          required
+        />
+      </label>
 
-      <input
-        type="number"
-        name="cupo"
-        value={formData.cupo}
-        placeholder="Cupo"
-        onChange={handleChange}
-      />
+      <label>
+        Instructor
+        <input
+          type="text"
+          name="profesor"
+          value={formData.profesor}
+          placeholder="Nombre del profesor"
+          onChange={handleChange}
+          required
+        />
+      </label>
 
-      <input
-        type="datetime-local"
-        name="fechaInicio"
-        value={formData.fechaInicio}
-        onChange={handleChange}
-      />
+      <label>
+        Cupo máximo
+        <input
+          type="number"
+          name="cupo"
+          min="1"
+          value={formData.cupo}
+          placeholder="12"
+          onChange={handleChange}
+          required
+        />
+      </label>
 
-      <input
-        type="datetime-local"
-        name="fechaFin"
-        value={formData.fechaFin}
-        onChange={handleChange}
-      />
+      <label>
+        Inicio
+        <input
+          type="datetime-local"
+          name="fechaInicio"
+          value={formData.fechaInicio}
+          onChange={handleChange}
+          required
+        />
+      </label>
 
-      <button type="submit">
-        {isEditing ? 'Guardar cambios' : 'Crear clase'}
-      </button>
+      <label>
+        Fin
+        <input
+          type="datetime-local"
+          name="fechaFin"
+          value={formData.fechaFin}
+          onChange={handleChange}
+          required
+        />
+      </label>
+
+      <button type="submit">{isEditing ? 'Guardar cambios' : 'Crear clase'}</button>
     </form>
   );
 }
