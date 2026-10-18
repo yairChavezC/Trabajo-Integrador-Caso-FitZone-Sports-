@@ -27,6 +27,11 @@ test('cancelación admite exactamente 2 horas y rechaza menos', () => {
   );
 });
 
+test('las ventanas rechazan fechas de inicio inválidas', () => {
+  assert.throws(() => validarVentanaReserva('fecha inválida', AHORA), { status: 400 });
+  assert.throws(() => validarVentanaCancelacion('fecha inválida', AHORA), { status: 400 });
+});
+
 test('reserva requiere una vacante disponible', () => {
   assert.doesNotThrow(() => validarCapacidadParaReserva(20, 19));
   assert.throws(() => validarCapacidadParaReserva(20, 20), { status: 409 });

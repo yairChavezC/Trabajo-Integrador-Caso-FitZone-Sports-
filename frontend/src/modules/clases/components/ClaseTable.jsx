@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 function estadoLabel(inscripcion) {
   if (!inscripcion) return 'Sin inscripción';
   if (inscripcion.estado === 'confirmado') {
@@ -10,8 +12,8 @@ function estadoLabel(inscripcion) {
   return inscripcion.estado;
 }
 
-const horasHastaInicio = (fechaInicio) =>
-  (new Date(fechaInicio).getTime() - Date.now()) / (1000 * 60 * 60);
+const horasHastaInicio = (fechaInicio, ahora) =>
+  (new Date(fechaInicio).getTime() - ahora) / (1000 * 60 * 60);
 
 const formatoFecha = (fecha) =>
   new Intl.DateTimeFormat('es-AR', {
@@ -28,9 +30,16 @@ export default function ClaseTable({
   onListaEspera,
   modoAdministracion = false
 }) {
+  const [ahora, setAhora] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setAhora(Date.now()), 60000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const clasesVisibles = modoAdministracion
     ? clases
-    : clases.filter((clase) => new Date(clase.fechaInicio).getTime() >= Date.now());
+    : clases.filter((clase) => new Date(clase.fechaInicio).getTime() >= ahora);
 
   if (!clasesVisibles.length) {
     return (
@@ -47,7 +56,7 @@ export default function ClaseTable({
       {clasesVisibles.map((clase) => {
         const llena = Number(clase.cupoDisponible) <= 0;
         const mia = clase.miInscripcion;
-        const horasRestantes = horasHastaInicio(clase.fechaInicio);
+        const horasRestantes = horasHastaInicio(clase.fechaInicio, ahora);
         const reservaHabilitada = horasRestantes >= 48;
         const cancelacionHabilitada = horasRestantes >= 2;
 

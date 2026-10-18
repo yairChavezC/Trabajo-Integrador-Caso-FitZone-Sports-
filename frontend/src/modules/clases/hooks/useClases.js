@@ -13,6 +13,10 @@ import {
 } from '../services/claseService';
 
 const unwrap = (payload) => payload?.data ?? payload;
+const toList = (data) => Array.isArray(data) ? data : data?.data ?? [];
+
+const loadClases = async () => toList(await getClases());
+const loadNotificaciones = async () => toList(await getNotificacionesClases());
 
 export const useClases = () => {
   const { sedeSeleccionada } = useSede();
@@ -23,25 +27,21 @@ export const useClases = () => {
   const [notificaciones, setNotificaciones] = useState([]);
   const [notificationError, setNotificationError] = useState(null);
 
-  const fetchClases = useCallback(async ({ showLoading = true } = {}) => {
+  const fetchClases = useCallback(async () => {
     try {
-      if (showLoading) setLoading(true);
-      const data = await getClases();
-      const lista = Array.isArray(data) ? data : data.data ?? [];
-
-      setClases(lista);
+      setLoading(true);
+      setClases(await loadClases());
       setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
-      if (showLoading) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
   const fetchNotificaciones = useCallback(async () => {
     try {
-      const data = await getNotificacionesClases();
-      setNotificaciones(Array.isArray(data) ? data : data.data ?? []);
+      setNotificaciones(await loadNotificaciones());
       setNotificationError(null);
     } catch (err) {
       setNotificationError(err.message);
@@ -49,17 +49,49 @@ export const useClases = () => {
   }, []);
 
   useEffect(() => {
-    fetchClases();
-  }, [fetchClases]);
+    let desmontado = false;
+    const cargar = async () => {
+      try {
+        const data = await loadClases();
+        if (desmontado) return;
+        setClases(data);
+        setError(null);
+      } catch (err) {
+        if (!desmontado) setError(err.message);
+      } finally {
+        if (!desmontado) setLoading(false);
+      }
+    };
+
+    void cargar();
+    return () => {
+      desmontado = true;
+    };
+  }, []);
 
   useEffect(() => {
-    fetchNotificaciones();
+    let desmontado = false;
+    const cargar = async () => {
+      try {
+        const data = await loadNotificaciones();
+        if (desmontado) return;
+        setNotificaciones(data);
+        setNotificationError(null);
+      } catch (err) {
+        if (!desmontado) setNotificationError(err.message);
+      }
+    };
+
+    void cargar();
     const intervalId = window.setInterval(() => {
-      fetchNotificaciones();
+      void cargar();
     }, 30000);
 
-    return () => window.clearInterval(intervalId);
-  }, [fetchNotificaciones]);
+    return () => {
+      desmontado = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const clasesDeSede = sedeSeleccionada
     ? clases.filter((clase) => Number(clase.idSede) === Number(sedeSeleccionada.id))

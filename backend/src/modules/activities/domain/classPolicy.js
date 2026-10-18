@@ -3,8 +3,14 @@ import { BusinessError } from '../errors.js';
 export const HORAS_ANTICIPACION_RESERVA = 48;
 export const HORAS_LIMITE_CANCELACION = 2;
 
-const horasHastaInicio = (fechaInicio, ahora) =>
-  (new Date(fechaInicio).getTime() - ahora) / (1000 * 60 * 60);
+const horasHastaInicio = (fechaInicio, ahora) => {
+  const inicio = new Date(fechaInicio).getTime();
+  if (Number.isNaN(inicio)) {
+    throw new BusinessError('La fecha de inicio no es válida.', 400);
+  }
+
+  return (inicio - ahora) / (1000 * 60 * 60);
+};
 
 export const validarVentanaReserva = (fechaInicio, ahora = Date.now()) => {
   if (horasHastaInicio(fechaInicio, ahora) < HORAS_ANTICIPACION_RESERVA) {
