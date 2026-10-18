@@ -409,3 +409,42 @@ a.member-card:hover {
   gap: 12px;
   color: var(--fz-muted);
 }
+
+/* Paginación */
+
+.results-footer {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pager-info {
+  color: var(--fz-muted);
+  font-size: 12px;
+}
+
+.pager-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--fz-border);
+  border-radius: 8px;
+  background: white;
+  color: var(--fz-text);
+}
+
+.pager-btn:hover:not(:disabled) {
+  background: #f8f9fc;
+}
+
+.pager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Users,
@@ -14,6 +15,8 @@ import MemberCard from '../components/MemberCard';
 import NuevoSocioModal from '../components/NuevoSocioModal';
 import './MembershipsPage.css';
 
+const PAGE_SIZE = 10;
+
 function getEstado(member) {
   if (!member.activo) return 'Suspendido';
   return member.enMora ? 'Vencido' : 'Activo';
@@ -24,6 +27,7 @@ export default function MembershipsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(1);
 
   const socios = useMemo(
     () => members.map((m) => ({ ...m, estado: getEstado(m) })),
@@ -47,6 +51,21 @@ export default function MembershipsPage() {
     const matchesStatus = statusFilter === 'all' || s.estado === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+
+  function handleSearch(e) {
+    setSearch(e.target.value);
+    setPage(1);
+  }
+
+  function handleStatusFilter(e) {
+    setStatusFilter(e.target.value);
+    setPage(1);
+  }
 
   function handleNuevoSocio() {
     setShowForm(true);
@@ -108,7 +127,7 @@ export default function MembershipsPage() {
                 aria-label="Buscar socios por nombre o DNI"
                 placeholder="Buscar por nombre o DNI"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={handleSearch}
               />
             </label>
 
@@ -118,7 +137,7 @@ export default function MembershipsPage() {
                 <select
                   id="membership-status"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={handleStatusFilter}
                 >
                   <option value="all">Todos los estados</option>
                   <option value="Activo">Activo</option>
@@ -163,13 +182,45 @@ export default function MembershipsPage() {
 
         {!loading && !error && filtered.length > 0 && (
           <div className="member-list">
-            {filtered.map((member) => (
+            {pageItems.map((member) => (
               <MemberCard key={member.id} member={member} />
             ))}
           </div>
         )}
 
-        <div className="results-footer">{filtered.length} socios</div>
+        <div className="results-footer">
+          <span>
+            {filtered.length === 0
+              ? '0 socios'
+              : `Mostrando ${startIndex + 1}–${startIndex + pageItems.length} de ${filtered.length} socios`}
+          </span>
+
+          {totalPages > 1 && (
+            <div className="pager">
+              <button
+                type="button"
+                className="pager-btn"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                aria-label="Página anterior"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="pager-info">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                className="pager-btn"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                aria-label="Página siguiente"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </section>
 
       {showForm && (
