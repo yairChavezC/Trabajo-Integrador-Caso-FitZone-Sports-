@@ -3,11 +3,15 @@ import { useAcceso } from '../hooks/useAcceso.js';
 import { AforoCard } from '../components/AforoCard.jsx';
 import { LectorQRForm } from '../components/LectorQRForm.jsx';
 import { httpClient } from '../../../core/api/httpClient.js';
+import { useSede } from '../../../shared/context/SedeContext.jsx'; // 👈 Importamos el contexto global de sedes
 
 export const AccesoScreen = () => {
     const { loading, error, resultado, registrarIngresoUI } = useAcceso();
     
-    const [sedeIdActual, setSedeIdActual] = useState(1);
+    // 🌍 Usamos la sede global del sistema en lugar de un estado local aislado
+    const { sedeSeleccionada } = useSede();
+    const sedeIdActual = sedeSeleccionada?.id || 1;
+
     const [aforoActual, setAforoActual] = useState(0);
     const [historial, setHistorial] = useState([]);
 
@@ -54,9 +58,11 @@ export const AccesoScreen = () => {
         }
     };
 
-    // Sincronización automática al cargar el componente o cambiar de sucursal
+    // Sincronización automática al cargar el componente o cuando el usuario cambia de sucursal arriba
     useEffect(() => {
-        sincronizarEstadoBD(sedeIdActual);
+        if (sedeIdActual) {
+            sincronizarEstadoBD(sedeIdActual);
+        }
     }, [sedeIdActual]);
 
     /**
@@ -103,20 +109,13 @@ export const AccesoScreen = () => {
     return (
         <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             
-            {/* Encabezado con selector de sucursales */}
+            {/* Encabezado limpio integrado con la Sede Global */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '0.5rem', marginBottom: '2rem' }}>
-                <h2 style={{ margin: 0, color: '#2c3e50' }}>Panel de Recepción</h2>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: 'bold', color: '#666' }}>Sucursal Actual:</span>
-                    <select 
-                        value={sedeIdActual} 
-                        onChange={(e) => setSedeIdActual(Number(e.target.value))}
-                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', outline: 'none' }}
-                    >
-                        <option value={1}>Sede Centro (Concordia)</option>
-                        <option value={2}>Sede Costanera</option>
-                    </select>
+                <div>
+                    <h2 style={{ margin: 0, color: '#2c3e50' }}>Panel de Recepción</h2>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#666', fontSize: '0.9rem' }}>
+                        Sucursal activa: <strong>{sedeSeleccionada ? `${sedeSeleccionada.nombre} (${sedeSeleccionada.ciudad})` : 'Cargando...'}</strong>
+                    </p>
                 </div>
             </div>
 
