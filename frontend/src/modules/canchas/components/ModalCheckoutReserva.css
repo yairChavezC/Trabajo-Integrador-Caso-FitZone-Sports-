@@ -1,0 +1,181 @@
+.modal-checkout-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999; /* Por encima del drawer */
+  backdrop-filter: blur(2px);
+}
+
+.modal-checkout-card {
+  background: #ffffff;
+  width: 90%;
+  max-width: 440px;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  animation: modalEntrada 0.2s ease-out;
+}
+
+@keyframes modalEntrada {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-checkout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-checkout-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.modal-checkout-body {
+  padding: 20px;
+}
+
+.resumen-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.resumen-label {
+  color: #64748b;
+}
+
+.modal-divider {
+  border: 0;
+  height: 1px;
+  background-color: #f1f5f9;
+  margin: 16px 0;
+}
+
+.precios-desglose .precio-fila {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.precios-desglose .tachado {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.precios-desglose .descuento-texto {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.precios-desglose .total {
+  font-size: 1.05rem;
+  margin-top: 10px;
+}
+
+.total-monto {
+  color: #4338ca;
+  font-size: 1.25rem;
+}
+
+.metodo-pago-selector .metodo-label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 10px;
+}
+
+.metodo-opciones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.metodo-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.metodo-chip input {
+  display: none;
+}
+
+.metodo-chip.activo {
+  border-color: #4338ca;
+  background-color: #eef2ff;
+  color: #4338ca;
+}
+
+.modal-checkout-footer {
+  padding: 16px 20px;
+  background-color: #f8fafc;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-cancelar {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-confirmar {
+  background-color: #4338ca;
+  border: none;
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-confirmar:hover:not(:disabled) {
+  background-color: #3730a3;
+}
+
+.btn-confirmar:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}

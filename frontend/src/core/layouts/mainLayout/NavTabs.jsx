@@ -1,4 +1,5 @@
 import React from 'react';
+import './NavTabs.css';
 import { NavLink } from 'react-router-dom';
 
 const RUTAS_NAVEGACION = [

@@ -14,9 +14,21 @@ const formatearHora = (minutosTotales) => {
 
 export const obtenerGrillaCanchas = async (idSede, fechaStr) => {
   const fecha = new Date(`${fechaStr}T00:00:00`);
-  const diaSemana = fecha.getDay(); // 0: Domingo, 1: Lunes, etc.
+  const diaSemana = fecha.getDay();
 
-  const canchas = await canchaRepo.findCanchasConConfigPorSede(idSede, diaSemana);
+  // 1. Ejecutamos ambas consultas a la base en simultáneo
+  const [canchas, reservas] = await Promise.all([
+    canchaRepo.findCanchasConConfigPorSede(idSede, diaSemana),
+    canchaRepo.findReservasPorSedeYFecha(idSede, fechaStr)
+  ]);
+
+  // Pre-procesamos las reservas a minutos para que la comparación sea instantánea
+  const reservasMapeadas = reservas.map((r) => ({
+    idCancha: Number(r.id_cancha),
+    inicioMin: parsearMinutos(r.hora_inicio),
+    finMin: parsearMinutos(r.hora_fin),
+    estado: r.estado
+  }));
 
   return canchas.map((c) => {
     const slots = [];
@@ -28,6 +40,11 @@ export const obtenerGrillaCanchas = async (idSede, fechaStr) => {
       const picoInicio = parsearMinutos(c.inicio_hora_pico);
       const picoFin = parsearMinutos(c.fin_hora_pico);
 
+      // Filtramos las reservas correspondientes a esta cancha en particular
+      const reservasDeEstaCancha = reservasMapeadas.filter(
+        (r) => r.idCancha === Number(c.id)
+      );
+
       for (let actual = inicioMin; actual + duracion <= finMin; actual += duracion) {
         const slotInicio = actual;
         const slotFin = actual + duracion;
@@ -35,13 +52,19 @@ export const obtenerGrillaCanchas = async (idSede, fechaStr) => {
         const esPico = c.inicio_hora_pico && slotInicio >= picoInicio && slotInicio < picoFin;
         const precio = esPico && c.precio_hora_pico ? Number(c.precio_hora_pico) : Number(c.precio_base || 18000);
 
+        // 2. Evaluamos si el slot actual se solapa con alguna reserva existente
+        const reservaExistente = reservasDeEstaCancha.find(
+          (r) => slotInicio < r.finMin && slotFin > r.inicioMin
+        );
+
         slots.push({
           inicio: formatearHora(slotInicio),
           fin: formatearHora(slotFin),
           esPico,
           precio,
           precioSocio: Math.round(precio * 0.85),
-          estado: 'libre'
+          // Si hay reserva, toma su estado ('confirmada', 'pendiente', etc.), sino 'libre'
+          estado: reservaExistente ? reservaExistente.estado : 'libre'
         });
       }
     }

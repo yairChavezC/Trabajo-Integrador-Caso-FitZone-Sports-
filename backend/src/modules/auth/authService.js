@@ -22,7 +22,7 @@ export const realizarLogin = async (nombre_usuario, contrasenia) => {
     const token = jwt.sign(
         { id: usuario.id, dni: usuario.dni, rol: usuario.id_rol },
         process.env.JWT_SECRET,
-        { expiresIn: '4h' }
+        { expiresIn: '30m' }
     );
 
     return {
@@ -30,7 +30,8 @@ export const realizarLogin = async (nombre_usuario, contrasenia) => {
         usuario: { 
             id: usuario.id, 
             nombre: usuario.nombre, 
-            rol: usuario.id_rol 
+            rol: usuario.id_rol,
+            foto: usuario.foto || null
         }
     };
 };

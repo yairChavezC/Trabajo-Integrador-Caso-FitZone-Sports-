@@ -25,7 +25,7 @@ export const verificarToken = (req, res, next) => {
         
     } catch (error) {
         // Atrapamos errores si el token fue adulterado o ya se venció
-        return res.status(403).json({ 
+        return res.status(401).json({ 
             error: 'Token inválido o expirado. Acceso prohibido.' 
         });
     }

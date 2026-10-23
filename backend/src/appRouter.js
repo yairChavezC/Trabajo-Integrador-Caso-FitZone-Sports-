@@ -7,19 +7,23 @@ import accessRoutes from './modules/accesses/routes/accessRoutes.js';
 import paymentRoutes from './modules/payments/routes/paymentRoutes.js';
 import activityRoutes from './modules/activities/routes/activityRoutes.js';
 import usersRoutes from './modules/users/users.routes.js';
+import reservaCanchaRoutes from './modules/reservaCancha/reservaCanchaRoutes.js';
+
 
 const router = Router();
 
-// 1. RUTAS PÚBLICAS (No piden token)
+//RUTAS PÚBLICAS (No piden token)
 router.use('/auth', authRoutes);
 
-// 🔒 BARRERA DE SEGURIDAD
-// A partir de esta línea, cualquier ruta definida abajo exige token obligatorio
+
+
+//A partir de esta línea, cualquier ruta definida abajo exige token obligatorio
 router.use(verificarToken);
 
-// 2. RUTAS PROTEGIDAS (Exigen token)
+//RUTAS PROTEGIDAS (Exigen token)
 router.use('/sedes', sedeRoutes);
 router.use('/canchas', canchasRoutes);
+router.use('/reservas-canchas', reservaCanchaRoutes);
 router.use('/accesses', accessRoutes);
 router.use('/payments', paymentRoutes); // <-- Protegido nuevamente abajo de la barrera
 router.use('/clases', activityRoutes);

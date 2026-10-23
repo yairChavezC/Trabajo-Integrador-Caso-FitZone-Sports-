@@ -7,16 +7,28 @@ const MESES = [
 ];
 const DIAS_SEMANA = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
 
-export function CustomDatePicker({ fechaSeleccionada, onChangeFecha }) {
+export function CustomDatePicker({ fecha, fechaSeleccionada, onChangeFecha, onChange }) {
   const [abierto, setAbierto] = useState(false);
   const contenedorRef = useRef(null);
 
-  // Parsear fecha actual YYYY-MM-DD
-  const [anio, mes, dia] = fechaSeleccionada.split('-').map(Number);
+  // Acepta tanto 'fecha' como 'fechaSeleccionada'. Si no viene ninguna, usa la fecha de hoy.
+  const fechaValor = fechaSeleccionada || fecha || new Date().toISOString().split('T')[0];
+  const notificarCambio = onChangeFecha || onChange || (() => {});
+
+  // Parsear fecha YYYY-MM-DD
+  const [anio, mes, dia] = fechaValor.split('-').map(Number);
   const [vistaMes, setVistaMes] = useState(mes - 1);
   const [vistaAnio, setVistaAnio] = useState(anio);
 
-  // Cerrar al hacer clic afuera
+  // Sincronizar la vista interna si la fecha cambia desde afuera
+  useEffect(() => {
+    if (mes && anio) {
+      setVistaMes(mes - 1);
+      setVistaAnio(anio);
+    }
+  }, [mes, anio]);
+
+  // Cerrar el popover al hacer clic afuera
   useEffect(() => {
     const clickAfuera = (e) => {
       if (contenedorRef.current && !contenedorRef.current.contains(e.target)) {
@@ -28,6 +40,7 @@ export function CustomDatePicker({ fechaSeleccionada, onChangeFecha }) {
   }, []);
 
   const formatearFechaDisplay = (str) => {
+    if (!str) return '';
     const [y, m, d] = str.split('-');
     return `${d}/${m}/${y}`;
   };
@@ -56,7 +69,7 @@ export function CustomDatePicker({ fechaSeleccionada, onChangeFecha }) {
   const handleElegirDia = (nroDia) => {
     const dStr = String(nroDia).padStart(2, '0');
     const mStr = String(vistaMes + 1).padStart(2, '0');
-    onChangeFecha(`${vistaAnio}-${mStr}-${dStr}`);
+    notificarCambio(`${vistaAnio}-${mStr}-${dStr}`);
     setAbierto(false);
   };
 
@@ -68,7 +81,7 @@ export function CustomDatePicker({ fechaSeleccionada, onChangeFecha }) {
         onClick={() => setAbierto(!abierto)}
       >
         <span className="dp-label">FECHA:</span>
-        <span className="dp-valor">{formatearFechaDisplay(fechaSeleccionada)}</span>
+        <span className="dp-valor">{formatearFechaDisplay(fechaValor)}</span>
         <span className="dp-icono">📅</span>
       </button>
 
