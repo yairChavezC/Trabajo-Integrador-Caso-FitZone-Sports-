@@ -2,43 +2,47 @@ import React, { useState, useEffect } from 'react';
 import { useAcceso } from '../hooks/useAcceso.js';
 import { AforoCard } from '../components/AforoCard.jsx';
 import { LectorQRForm } from '../components/LectorQRForm.jsx';
+import { IngresoExternoModal } from '../components/IngresoExternoModal.jsx';
 import { httpClient } from '../../../core/api/httpClient.js';
-import { useSede } from '../../../shared/context/SedeContext.jsx'; // 👈 Importamos el contexto global de sedes
+import { useSede } from '../../../shared/context/SedeContext.jsx';
+import { useAuth } from '../../../core/auth/AuthContext.jsx';
+import { accesoService } from '../services/accesoService.js';
+import { SocioDashboard } from './SocioDashboard.jsx'; // 👈 Importamos la vista del socio
 
 export const AccesoScreen = () => {
-    const { loading, error, resultado, registrarIngresoUI } = useAcceso();
+    const { usuario } = useAuth();
     
-    // 🌍 Usamos la sede global del sistema en lugar de un estado local aislado
+    // Obtenemos el rol del usuario activo (1: Recepcionista, 3: Socio, 4: Gerente)
+    const rolNumerico = Number(usuario?.rol) || Number(usuario?.id_rol) || 3;
+
+    // =================================================================
+    // ESTADOS Y LÓGICA DEL PANEL DE RECEPCIÓN (Roles 1 y 4)
+    // =================================================================
+    const { loading, error, resultado, registrarIngresoUI } = useAcceso();
     const { sedeSeleccionada } = useSede();
     const sedeIdActual = sedeSeleccionada?.id || 1;
 
     const [aforoActual, setAforoActual] = useState(0);
     const [historial, setHistorial] = useState([]);
+    const [showModalExterno, setShowModalExterno] = useState(false);
+    const [loadingExterno, setLoadingExterno] = useState(false);
 
-    /**
-     * Sincroniza el aforo y el historial de movimientos de la sucursal desde PostgreSQL.
-     */
     const sincronizarEstadoBD = async (sedeId) => {
         try {
             const response = await httpClient.get(`/accesses/estado/${sedeId}`);
-            
-            // Extracción blindada del payload de respuesta
             const payload = response?.data?.data || response?.data || response;
 
             if (payload) {
-                // Sincronizar Aforo actual
                 const aforoServidor = payload.aforoActual ?? payload.aforo;
                 if (typeof aforoServidor === 'number') {
                     setAforoActual(aforoServidor);
                 }
                 
-                // Sincronizar Últimos Movimientos
                 const movimientosRaw = payload.ultimosMovimientos || payload.movimientos || [];
                 if (Array.isArray(movimientosRaw) && movimientosRaw.length > 0) {
                     const movimientosMapeados = movimientosRaw.map(m => {
                         const esSalida = m.fecha_salida !== null && m.fecha_salida !== undefined;
                         const fechaRef = esSalida ? new Date(m.fecha_salida) : new Date(m.fecha_entrada);
-                        
                         const nombreUsuario = m.nombre ? m.nombre : `Socio #${m.id_usuario || 'ID'}`;
                         
                         return {
@@ -58,16 +62,13 @@ export const AccesoScreen = () => {
         }
     };
 
-    // Sincronización automática al cargar el componente o cuando el usuario cambia de sucursal arriba
+    // Solo sincronizamos la recepción si NO es socio
     useEffect(() => {
-        if (sedeIdActual) {
+        if (sedeIdActual && rolNumerico !== 3) {
             sincronizarEstadoBD(sedeIdActual);
         }
-    }, [sedeIdActual]);
+    }, [sedeIdActual, rolNumerico]);
 
-    /**
-     * Maneja el escaneo del código QR a través del lector.
-     */
     const handleEscanearQR = async (qrCode) => {
         try {
             await registrarIngresoUI(qrCode, sedeIdActual);
@@ -83,9 +84,6 @@ export const AccesoScreen = () => {
         }
     };
 
-    /**
-     * Maneja el ajuste manual del aforo y simula el registro en la vista.
-     */
     const handleAjusteManual = (tipo) => {
         if (tipo === 'ingreso') {
             setAforoActual(prev => prev + 1);
@@ -106,10 +104,37 @@ export const AccesoScreen = () => {
         }
     };
 
+    const handleIngresoExterno = async (datos) => {
+        setLoadingExterno(true);
+        try {
+            await accesoService.registrarIngresoExterno(datos, sedeIdActual);
+            setHistorial(prev => [{ 
+                id: Date.now(), 
+                hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute:'2-digit', second:'2-digit' }), 
+                evento: `Ingreso Externo (${datos.nombre})`, 
+                estado: 'Autorizado' 
+            }, ...prev].slice(0, 5));
+            setShowModalExterno(false);
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setLoadingExterno(false);
+        }
+    };
+
+    // =================================================================
+    // RENDER CONDICIONAL: ¿QUÉ VISTA LE MOSTRAMOS AL USUARIO?
+    // =================================================================
+
+    // 🔴 VISTA SOCIO: Si es rol 3, le mostramos directamente su Dashboard y cortamos la ejecución acá.
+    if (rolNumerico === 3) {
+        return <SocioDashboard />;
+    }
+
+    // 🟢 VISTA RECEPCIÓN/GERENCIA: Si llega hasta acá, es porque es Rol 1 o 4
     return (
         <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             
-            {/* Encabezado limpio integrado con la Sede Global */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '0.5rem', marginBottom: '2rem' }}>
                 <div>
                     <h2 style={{ margin: 0, color: '#2c3e50' }}>Panel de Recepción</h2>
@@ -117,38 +142,31 @@ export const AccesoScreen = () => {
                         Sucursal activa: <strong>{sedeSeleccionada ? `${sedeSeleccionada.nombre} (${sedeSeleccionada.ciudad})` : 'Cargando...'}</strong>
                     </p>
                 </div>
+                <button 
+                    onClick={() => setShowModalExterno(true)} 
+                    style={{ padding: '0.6rem 1.2rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                    + Ingreso Externo
+                </button>
             </div>
 
             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'stretch' }}>
-                
-                {/* Columna Izquierda: Lector QR y Alertas */}
                 <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column' }}>
                     <LectorQRForm 
                         onEscanear={handleEscanearQR} 
                         loading={loading} 
                     />
                     
-                    {/* Alertas dinámicas de estado */}
                     <div style={{ minHeight: '80px', marginTop: '1rem' }}>
                         {error && (
-                            <div style={{ 
-                                padding: '1rem', backgroundColor: '#ffebee', color: '#c62828', 
-                                borderRadius: '8px', borderLeft: '4px solid #c62828', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                            }}>
+                            <div style={{ padding: '1rem', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', borderLeft: '4px solid #c62828', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                                 <strong>Acceso Denegado: </strong> 
                                 {typeof error === 'string' ? error : error.message}
                             </div>
                         )}
 
                         {resultado && resultado.autorizado && (
-                            <div style={{ 
-                                padding: '1rem', 
-                                backgroundColor: resultado.tipoAccion === 'ingreso' ? '#e8f5e9' : '#e3f2fd', 
-                                color: resultado.tipoAccion === 'ingreso' ? '#2e7d32' : '#0d47a1', 
-                                borderRadius: '8px', 
-                                borderLeft: `5px solid ${resultado.tipoAccion === 'ingreso' ? '#2e7d32' : '#1976d2'}`, 
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                            }}>
+                            <div style={{ padding: '1rem', backgroundColor: resultado.tipoAccion === 'ingreso' ? '#e8f5e9' : '#e3f2fd', color: resultado.tipoAccion === 'ingreso' ? '#2e7d32' : '#0d47a1', borderRadius: '8px', borderLeft: `5px solid ${resultado.tipoAccion === 'ingreso' ? '#2e7d32' : '#1976d2'}`, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                                 <strong style={{ fontSize: '1.05rem' }}>
                                     {resultado.tipoAccion === 'ingreso' ? '✅ ¡Ingreso Autorizado! ' : '👋 ¡Salida Registrada! '}
                                 </strong> 
@@ -162,7 +180,6 @@ export const AccesoScreen = () => {
                     </div>
                 </div>
 
-                {/* Columna Derecha: Tarjeta de Aforo */}
                 <div style={{ flex: '1 1 350px' }}>
                     <AforoCard 
                         aforoActual={aforoActual} 
@@ -172,10 +189,9 @@ export const AccesoScreen = () => {
                 </div>
             </div>
 
-            {/* Historial en vivo sincronizado con la base de datos */}
             <div style={{ marginTop: '2rem', border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderBottom: '1px solid #eee' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#495057' }}>Últimos Movimientos en Puerta (Sincronizado con BD)</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#495057' }}>Últimos Movimientos en Puerta</h3>
                 </div>
                 
                 {historial.length === 0 ? (
@@ -211,6 +227,14 @@ export const AccesoScreen = () => {
                     </table>
                 )}
             </div>
+
+            {showModalExterno && (
+                <IngresoExternoModal 
+                    onClose={() => setShowModalExterno(false)} 
+                    onGuardar={handleIngresoExterno} 
+                    loading={loadingExterno} 
+                />
+            )}
         </div>
     );
 };

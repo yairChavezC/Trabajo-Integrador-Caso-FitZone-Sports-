@@ -13,21 +13,30 @@ export function UserProfileCard({ onLogout }) {
   const usuario = usuarioContext || usuarioLocal;
 
   const nombreMostrar = usuario.nombre || 'Luis Advíncula';
-  const rolMostrar = Number(usuario.rol) === 1 || Number(usuario.id_rol) === 1 ? 'Administrador' : 'Socio Activo';
+  
+  // 👈 AJUSTADO SEGÚN TU TABLA DE ROLES
+  const rolMostrar = Number(usuario.rol) === 4 || Number(usuario.id_rol) === 4 ? 'Gerente' : 
+                     Number(usuario.rol) === 1 || Number(usuario.id_rol) === 1 ? 'Recepcionista' : 'Socio Activo';
   const fotoUrl = usuario.foto || usuario.foto_url;
   const inicial = nombreMostrar.charAt(0).toUpperCase();
+  
+  // Extraemos el rol numérico exacto para condicionales
+  const rolNumerico = Number(usuario.rol) || Number(usuario.id_rol) || 3;
 
   return (
     <div className="topbar-user-section">
-      {/* Botón Mi Pase QR */}
-      <button 
-        type="button" 
-        className="btn-pase-qr"
-        onClick={() => navigate('/mi-credencial')}
-      >
-        <span className="qr-icon">▦</span>
-        <span className="qr-text">Mi Pase QR</span>
-      </button>
+    
+      {/* 🔴 Botón Mi Pase QR: Solo visible para Socios (Rol 3) */}
+      {rolNumerico === 3 && (
+        <button 
+          type="button" 
+          className="btn-pase-qr"
+          onClick={() => navigate('/mi-credencial')}
+        >
+          <span className="qr-icon">▦</span>
+          <span className="qr-text">Mi Pase QR</span>
+        </button>
+      )}
 
       {/* Notificaciones */}
       <div className="btn-notificaciones-badge">

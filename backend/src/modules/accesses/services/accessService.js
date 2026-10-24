@@ -119,6 +119,59 @@ class AccessService {
             };
         }
     }
+
+    // =====================================================================
+    // REGISTRO DE CLIENTE EXTERNO
+    // =====================================================================
+    /**
+     * Registra un cliente externo en la tabla usuarios y marca el ingreso.
+     */
+    async registrarIngresoExterno({ nombre, dni, sedeId }) {
+        try {
+            let usuarioBd = null;
+
+            // 1. Comprobar si ya existe en la BD por DNI
+            if (typeof accessRepository.findUserByDni === 'function') {
+                 usuarioBd = await accessRepository.findUserByDni(dni);
+            }
+
+            // 2. Si no existe, lo creamos con id_rol = 2 (Cliente Externo)
+            if (!usuarioBd) {
+                 const ROL_CLIENTE_EXTERNO = 2; // 👈 2 = Cliente Externo
+
+                 if (typeof accessRepository.createUserPublic === 'function') {
+                     usuarioBd = await accessRepository.createUserPublic({
+                         nombre: nombre,
+                         dni: dni,
+                         id_rol: ROL_CLIENTE_EXTERNO // Sin email porque la columna no existe
+                     });
+                 }
+            }
+
+            // 3. Registrar el ingreso en la tabla control_acceso
+            const registro = await accessRepository.createAccess({ 
+                idSede: sedeId, 
+                idUserId: usuarioBd.id 
+            });
+
+            // 4. Retornar payload exitoso
+            return {
+                autorizado: true,
+                tipoAccion: 'ingreso',
+                mensaje: `Cliente externo ${nombre} registrado con éxito.`,
+                usuario: {
+                    id: usuarioBd.id,
+                    nombre: usuarioBd.nombre,
+                    rol: 'cliente_externo'
+                },
+                acceso: registro
+            };
+
+        } catch (error) {
+            console.error("Error en registrarIngresoExterno:", error);
+            throw error;
+        }
+    }
 }
 
 export default new AccessService();

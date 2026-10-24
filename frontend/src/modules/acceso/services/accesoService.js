@@ -31,5 +31,21 @@ export const accesoService = {
             const mensajeError = error.response?.data?.mensaje || error.message || 'Error al procesar el escaneo.';
             throw new Error(mensajeError);
         }
+    },
+
+    /**
+     * Registra un cliente externo sin sumarlo al aforo.
+     */
+    registrarIngresoExterno: async (datosSocio, sedeId) => {
+        try {
+            const response = await httpClient.post('/accesses/externo', { 
+                ...datosSocio, 
+                sedeId 
+            });
+            return response.data;
+        } catch (error) {
+            const mensajeError = error.response?.data?.mensaje || error.message || 'Error al registrar el ingreso del cliente externo.';
+            throw new Error(mensajeError);
+        }
     }
 };
