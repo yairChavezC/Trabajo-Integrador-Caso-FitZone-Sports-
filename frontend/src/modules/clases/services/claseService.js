@@ -4,6 +4,10 @@ export const getClases = async () => {
   return httpClient.get('/clases');
 };
 
+export const getRolClases = async () => {
+  return httpClient.get('/clases/mi-rol');
+};
+
 export const getClaseById = async (id) => {
   return httpClient.get(`/clases/${id}`);
 };
@@ -32,10 +36,6 @@ export const anotarListaEspera = async (id) => {
   return httpClient.post(`/clases/${id}/lista-espera`);
 };
 
-export const getNotificacionesClases = async () => {
-  return httpClient.get('/clases/notificaciones');
-};
-
-export const marcarNotificacionClaseLeida = async (id) => {
-  return httpClient.put(`/clases/notificaciones/${id}/leida`);
+export const aceptarOfertaListaEspera = async (id) => {
+  return httpClient.post(`/clases/${id}/lista-espera/aceptar`);
 };

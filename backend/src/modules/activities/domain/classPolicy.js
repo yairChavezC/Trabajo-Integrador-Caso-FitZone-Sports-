@@ -13,11 +13,18 @@ const horasHastaInicio = (fechaInicio, ahora) => {
 };
 
 export const validarVentanaReserva = (fechaInicio, ahora = Date.now()) => {
-  if (horasHastaInicio(fechaInicio, ahora) < HORAS_ANTICIPACION_RESERVA) {
+  const horasRestantes = horasHastaInicio(fechaInicio, ahora);
+  if (horasRestantes > HORAS_ANTICIPACION_RESERVA || horasRestantes <= 0) {
     throw new BusinessError(
-      `La reserva requiere al menos ${HORAS_ANTICIPACION_RESERVA} horas de anticipación.`,
+      `La reserva se habilita durante las ${HORAS_ANTICIPACION_RESERVA} horas previas al inicio de la clase.`,
       409
     );
+  }
+};
+
+export const validarVentanaListaEspera = (fechaInicio, ahora = Date.now()) => {
+  if (horasHastaInicio(fechaInicio, ahora) <= 0) {
+    throw new BusinessError('La lista de espera se cierra cuando comienza la clase.', 409);
   }
 };
 

@@ -1,6 +1,6 @@
 import { Route } from 'react-router-dom';
-import ClasesScreen from './pages/ClasesScreen';
+import ClasesRoute from './pages/ClasesRoute';
 
 export const clasesRoutes = (
-  <Route path="clases" element={<ClasesScreen />} />
+  <Route path="clases" element={<ClasesRoute />} />
 );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import './UserProfileCard.css';
@@ -14,19 +14,20 @@ export function UserProfileCard({ onLogout }) {
 
   const nombreMostrar = usuario.nombre || 'Luis Advíncula';
   
-  // 👈 AJUSTADO SEGÚN TU TABLA DE ROLES
-  const rolMostrar = Number(usuario.rol) === 4 || Number(usuario.id_rol) === 4 ? 'Gerente' : 
-                     Number(usuario.rol) === 1 || Number(usuario.id_rol) === 1 ? 'Recepcionista' : 'Socio Activo';
+  const rolNumerico = Number(usuario.rol) || Number(usuario.id_rol);
+  const nombresRoles = {
+    1: 'Recepcionista',
+    2: 'Cliente Externo',
+    3: 'Socio Activo',
+    4: 'Gerente'
+  };
+  const rolMostrar = nombresRoles[rolNumerico] || 'Usuario';
   const fotoUrl = usuario.foto || usuario.foto_url;
   const inicial = nombreMostrar.charAt(0).toUpperCase();
-  
-  // Extraemos el rol numérico exacto para condicionales
-  const rolNumerico = Number(usuario.rol) || Number(usuario.id_rol) || 3;
 
   return (
     <div className="topbar-user-section">
     
-      {/* 🔴 Botón Mi Pase QR: Solo visible para Socios (Rol 3) */}
       {rolNumerico === 3 && (
         <button 
           type="button" 
@@ -52,7 +53,7 @@ export function UserProfileCard({ onLogout }) {
               src={fotoUrl} 
               alt={nombreMostrar}
               className="user-avatar-photo"
-              onError={(e) => {
+              onError={() => {
                 console.warn('⚠️ La imagen falló al cargar desde la URL:', fotoUrl);
                 setErrorImagen(true);
               }}

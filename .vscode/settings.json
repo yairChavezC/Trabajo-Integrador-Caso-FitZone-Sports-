@@ -1,0 +1,5 @@
+{
+    "chat.editor.workingSet.enabled": true,
+    "chat.editing.explainChanges.enabled": true,
+    "chat.planAgent.defaultModel": "Auto (copilot)"
+}
