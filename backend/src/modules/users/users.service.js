@@ -5,8 +5,8 @@ function calcularMora(user) {
   return new Date(user.fecha_proximo_vencimiento) < new Date();
 }
 
-async function getAllUsers() {
-  const users = await repository.findAll();
+async function getAllUsers(filtros = {}) {
+  const users = await repository.findAll(filtros);
   return users.map((user) => ({
     ...user,
     enMora: calcularMora(user),
