@@ -1,33 +1,34 @@
 import pool from '../../config/db.js';
 
-async function findAll() {
+const SELECT_USUARIO = `
+  SELECT
+    u.id, u.nombre, u.dni, u.contacto, u.foto, u.id_rol, u.activo, u.creado_at,
+    s.estado AS estado_suscripcion,
+    s.fecha_proximo_vencimiento,
+    s.descuento,
+    s.id_plan
+  FROM usuario u
+  LEFT JOIN suscripcion s ON s.id_usuario = u.id
+`;
+
+async function findAll({ idRol } = {}) {
+  const params = [];
+  let where = '';
+
+  if (idRol !== undefined && idRol !== null) {
+    params.push(idRol);
+    where = `WHERE u.id_rol = $${params.length}`;
+  }
+
   const result = await pool.query(
-    `SELECT
-       u.id, u.nombre, u.dni, u.contacto, u.foto, u.id_rol, u.activo, u.creado_at,
-       s.estado AS estado_suscripcion,
-       s.fecha_proximo_vencimiento,
-       s.descuento,
-       s.id_plan
-     FROM usuario u
-     LEFT JOIN suscripcion s ON s.id_usuario = u.id
-     ORDER BY u.nombre ASC`
+    `${SELECT_USUARIO} ${where} ORDER BY u.nombre ASC`,
+    params
   );
   return result.rows;
 }
 
 async function findById(id) {
-  const result = await pool.query(
-    `SELECT
-       u.id, u.nombre, u.dni, u.contacto, u.foto, u.id_rol, u.activo, u.creado_at,
-       s.estado AS estado_suscripcion,
-       s.fecha_proximo_vencimiento,
-       s.descuento,
-       s.id_plan
-     FROM usuario u
-     LEFT JOIN suscripcion s ON s.id_usuario = u.id
-     WHERE u.id = $1`,
-    [id]
-  );
+  const result = await pool.query(`${SELECT_USUARIO} WHERE u.id = $1`, [id]);
   return result.rows[0] || null;
 }
 
