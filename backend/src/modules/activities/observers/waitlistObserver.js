@@ -1,7 +1,3 @@
-/**
- * Patrón Observer para RF-08 (lista de espera de clases grupales).
- * El Subject avisa a los observers cuando se libera un cupo por una baja.
- */
 export class WaitlistSubject {
   constructor() {
     this.observers = [];
@@ -24,7 +20,7 @@ export class WaitlistSubject {
 export class ConsoleWaitlistObserver {
   async update(evento) {
     console.log(
-      `[Observer/ListaEspera] Clase ${evento.idClase}: se generó una notificación para el usuario ${evento.idUsuario} ` +
+      `[Observer/ListaEspera] Clase ${evento.idClase}: oferta temporal enviada al usuario ${evento.idUsuario} ` +
         `(inscripción ${evento.idInscripcion}). Motivo: ${evento.motivo}`
     );
   }

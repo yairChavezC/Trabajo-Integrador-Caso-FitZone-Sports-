@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarVentanaReserva,
+  validarVentanaListaEspera,
   validarVentanaCancelacion,
   validarCapacidadParaReserva,
   validarCapacidadParaListaEspera,
@@ -11,12 +12,24 @@ import {
 const AHORA = new Date('2026-10-18T12:00:00Z').getTime();
 const horasDesdeAhora = (horas) => new Date(AHORA + horas * 60 * 60 * 1000);
 
-test('reserva admite exactamente 48 horas y rechaza menos', () => {
+test('la reserva se habilita dentro de las 48 horas previas al inicio', () => {
+  assert.throws(() => validarVentanaReserva(horasDesdeAhora(48.01), AHORA), { status: 409 });
   assert.doesNotThrow(() => validarVentanaReserva(horasDesdeAhora(48), AHORA));
+  assert.doesNotThrow(() => validarVentanaReserva(horasDesdeAhora(47.99), AHORA));
+  assert.doesNotThrow(() => validarVentanaReserva(horasDesdeAhora(24), AHORA));
+  assert.doesNotThrow(() => validarVentanaReserva(horasDesdeAhora(0.01), AHORA));
+  assert.throws(() => validarVentanaReserva(horasDesdeAhora(0), AHORA), { status: 409 });
   assert.throws(
-    () => validarVentanaReserva(horasDesdeAhora(47.99), AHORA),
+    () => validarVentanaReserva(horasDesdeAhora(-1), AHORA),
     { status: 409 }
   );
+});
+
+test('la lista de espera permanece abierta hasta el inicio de la clase', () => {
+  assert.doesNotThrow(() => validarVentanaListaEspera(horasDesdeAhora(72), AHORA));
+  assert.doesNotThrow(() => validarVentanaListaEspera(horasDesdeAhora(1), AHORA));
+  assert.throws(() => validarVentanaListaEspera(horasDesdeAhora(0), AHORA), { status: 409 });
+  assert.throws(() => validarVentanaListaEspera(horasDesdeAhora(-1), AHORA), { status: 409 });
 });
 
 test('cancelación admite exactamente 2 horas y rechaza menos', () => {
@@ -29,6 +42,7 @@ test('cancelación admite exactamente 2 horas y rechaza menos', () => {
 
 test('las ventanas rechazan fechas de inicio inválidas', () => {
   assert.throws(() => validarVentanaReserva('fecha inválida', AHORA), { status: 400 });
+  assert.throws(() => validarVentanaListaEspera('fecha inválida', AHORA), { status: 400 });
   assert.throws(() => validarVentanaCancelacion('fecha inválida', AHORA), { status: 400 });
 });
 

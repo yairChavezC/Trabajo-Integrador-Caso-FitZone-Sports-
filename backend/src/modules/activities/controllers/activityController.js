@@ -7,15 +7,15 @@ import {
   reserveClass,
   joinWaitlist,
   cancelClassReservation,
-  getInscriptionsByClass
+  getInscriptionsByClass,
+  getMyUpcomingRegistrations,
+  getCurrentUserRole,
+  getAssignedSiteForUser,
+  acceptWaitlistOfferForUser
 } from '../services/activityService.js';
 
-import { CreateActivityDTO } from '../dtos/activity.dto.js';
+import { CreateActivityDTO, UpdateActivityDTO } from '../dtos/activity.dto.js';
 import { BusinessError } from '../errors.js';
-import {
-  getClassNotifications,
-  markClassNotificationAsRead
-} from '../services/notificationService.js';
 
 const handleError = (res, error, fallbackMessage) => {
   if (error instanceof BusinessError) {
@@ -29,14 +29,46 @@ const handleError = (res, error, fallbackMessage) => {
   });
 };
 
-const getUserId = (req) => Number(req.usuario?.id);
+const getUserId = (req) => {
+  const id = Number(req.usuario?.id);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
 
 export const getActivities = async (req, res) => {
   try {
-    const activities = await getAllActivities(getUserId(req));
+    const tipo = await getCurrentUserRole(req.usuario?.rol);
+    const idSede = tipo === 'recepcionista'
+      ? await getAssignedSiteForUser(getUserId(req))
+      : null;
+    if (tipo === 'recepcionista' && !idSede) {
+      return res.status(403).json({ message: 'Tu perfil no tiene una sede asignada.' });
+    }
+    const activities = await getAllActivities(getUserId(req), idSede);
     return res.status(200).json(activities);
   } catch (error) {
     return handleError(res, error, 'Error al obtener las clases:');
+  }
+};
+
+export const getMyRegistrations = async (req, res) => {
+  try {
+    const registrations = await getMyUpcomingRegistrations(getUserId(req));
+    return res.status(200).json(registrations);
+  } catch (error) {
+    return handleError(res, error, 'Error al obtener mis inscripciones:');
+  }
+};
+
+export const getMyRole = async (req, res) => {
+  try {
+    const tipo = await getCurrentUserRole(req.usuario?.rol);
+    if (!tipo) return res.status(403).json({ message: 'El rol del usuario no está habilitado.' });
+    const idSede = tipo === 'recepcionista'
+      ? await getAssignedSiteForUser(getUserId(req))
+      : null;
+    return res.status(200).json({ tipo, idSede });
+  } catch (error) {
+    return handleError(res, error, 'Error al obtener el rol del usuario:');
   }
 };
 
@@ -48,10 +80,21 @@ export const getActivityById = async (req, res) => {
       return res.status(400).json({ message: 'El ID de la clase es inválido.' });
     }
 
+    const tipo = await getCurrentUserRole(req.usuario?.rol);
+    const idSede = tipo === 'recepcionista'
+      ? await getAssignedSiteForUser(getUserId(req))
+      : null;
+    if (tipo === 'recepcionista' && !idSede) {
+      return res.status(403).json({ message: 'Tu perfil no tiene una sede asignada.' });
+    }
+
     const activity = await getActivityByIdService(id, getUserId(req));
 
     if (!activity) {
       return res.status(404).json({ message: 'Clase no encontrada.' });
+    }
+    if (idSede && Number(activity.idSede) !== Number(idSede)) {
+      return res.status(403).json({ message: 'La clase no pertenece a tu sede asignada.' });
     }
 
     return res.status(200).json(activity);
@@ -97,7 +140,7 @@ export const updateActivity = async (req, res) => {
       return res.status(400).json({ message: 'El cuerpo de la solicitud está vacío.' });
     }
 
-    const dto = new CreateActivityDTO(req.body);
+    const dto = new UpdateActivityDTO(req.body);
     const errors = dto.validate();
 
     if (errors.length > 0) {
@@ -176,6 +219,23 @@ export const postWaitlist = async (req, res) => {
   }
 };
 
+export const acceptWaitlistOffer = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: 'El ID de la clase es inválido.' });
+    }
+
+    const inscription = await acceptWaitlistOfferForUser(id, getUserId(req));
+    return res.status(200).json({
+      message: 'Oferta aceptada; tu lugar quedó confirmado.',
+      data: inscription
+    });
+  } catch (error) {
+    return handleError(res, error, 'Error al aceptar la oferta de lista de espera:');
+  }
+};
+
 export const deleteReservation = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -204,28 +264,5 @@ export const getClassInscriptions = async (req, res) => {
     return res.status(200).json(inscriptions);
   } catch (error) {
     return handleError(res, error, 'Error al listar inscripciones:');
-  }
-};
-
-export const getNotifications = async (req, res) => {
-  try {
-    const notifications = await getClassNotifications(getUserId(req));
-    return res.status(200).json(notifications);
-  } catch (error) {
-    return handleError(res, error, 'Error al obtener las notificaciones:');
-  }
-};
-
-export const readNotification = async (req, res) => {
-  try {
-    const id = Number(req.params.notificationId);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: 'El ID de la notificación es inválido.' });
-    }
-
-    const notification = await markClassNotificationAsRead(id, getUserId(req));
-    return res.status(200).json(notification);
-  } catch (error) {
-    return handleError(res, error, 'Error al actualizar la notificación:');
   }
 };

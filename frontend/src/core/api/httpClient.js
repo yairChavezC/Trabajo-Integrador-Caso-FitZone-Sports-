@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Toma la URL base del entorno (Vite) o usa localhost por defecto
-const baseURL = import.meta.env?.VITE_API_URL || 'http://localhost:3000/api/';
+// La URL puede configurarse para despliegues con frontend y API en hosts distintos.
+const baseURL = import.meta.env?.VITE_API_URL || '/api/';
 
 export const httpClient = axios.create({
     baseURL,

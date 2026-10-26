@@ -57,51 +57,80 @@ export class CreateActivityDTO {
     }
 }
 
-
-export class ClassReservationDTO {
+export class UpdateActivityDTO {
     constructor(data = {}) {
-        this.idClase = data.idClase;
+        this.idSede = Object.hasOwn(data, 'idSede') ? Number(data.idSede) : undefined;
+        this.nombre = typeof data.nombre === 'string' ? data.nombre.trim() : data.nombre;
+        this.profesor = typeof data.profesor === 'string' ? data.profesor.trim() : data.profesor;
+        this.cupo = Object.hasOwn(data, 'cupo') ? Number(data.cupo) : undefined;
+        this.fechaInicio = data.fechaInicio;
+        this.fechaFin = data.fechaFin;
     }
 
-    validate() {
+    validate(current = null) {
         const errors = [];
+        const campos = ['idSede', 'nombre', 'profesor', 'cupo', 'fechaInicio', 'fechaFin'];
+        const enviados = campos.filter((campo) => this[campo] !== undefined);
 
-        if (!this.idClase) {
-            errors.push('El ID de la clase es obligatorio.');
+        if (enviados.length === 0) {
+            errors.push('Debe enviar al menos un campo válido para actualizar.');
+            return errors;
         }
 
-        return errors;
-    }
-}
+        const datos = current
+            ? Object.fromEntries(campos.map((campo) => [
+                campo,
+                this[campo] !== undefined ? this[campo] : current[campo]
+            ]))
+            : Object.fromEntries(enviados.map((campo) => [campo, this[campo]]));
 
-
-export class CancelClassReservationDTO {
-    constructor(data = {}) {
-        this.idClase = data.idClase;
-    }
-
-    validate() {
-        const errors = [];
-
-        if (!this.idClase) {
-            errors.push('El ID de la clase es obligatorio.');
+        if (datos.idSede !== undefined) {
+            const idSede = Number(datos.idSede);
+            if (!Number.isInteger(idSede) || idSede <= 0) {
+                errors.push('El ID de la sede debe ser un entero mayor a 0.');
+            }
         }
 
-        return errors;
-    }
-}
+        if (datos.nombre !== undefined && (
+            typeof datos.nombre !== 'string' ||
+            datos.nombre.length < 3 ||
+            datos.nombre.length > 100
+        )) {
+            errors.push('El nombre de la clase debe tener entre 3 y 100 caracteres.');
+        }
 
+        if (datos.profesor !== undefined && (
+            typeof datos.profesor !== 'string' ||
+            datos.profesor.length < 3 ||
+            datos.profesor.length > 150
+        )) {
+            errors.push('El profesor debe tener entre 3 y 150 caracteres.');
+        }
 
-export class WaitlistRegistrationDTO {
-    constructor(data = {}) {
-        this.idClase = data.idClase;
-    }
+        if (datos.cupo !== undefined && (
+            !Number.isInteger(Number(datos.cupo)) ||
+            Number(datos.cupo) <= 0
+        )) {
+            errors.push('El cupo debe ser un número entero mayor a 0.');
+        }
 
-    validate() {
-        const errors = [];
+        for (const [campo, etiqueta] of [
+            ['fechaInicio', 'inicio'],
+            ['fechaFin', 'fin']
+        ]) {
+            if (datos[campo] !== undefined && Number.isNaN(new Date(datos[campo]).getTime())) {
+                errors.push(`La fecha de ${etiqueta} no tiene un formato válido.`);
+            }
+        }
 
-        if (!this.idClase) {
-            errors.push('El ID de la clase es obligatorio.');
+        if (
+            datos.fechaInicio !== undefined &&
+            datos.fechaFin !== undefined &&
+            !Number.isNaN(new Date(datos.fechaInicio).getTime()) &&
+            !Number.isNaN(new Date(datos.fechaFin).getTime()) &&
+            new Date(datos.fechaFin) <= new Date(datos.fechaInicio)
+        ) {
+            errors.push('La fecha de fin debe ser posterior a la fecha de inicio.');
         }
 
         return errors;

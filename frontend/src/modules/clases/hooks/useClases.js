@@ -8,15 +8,13 @@ import {
   reservarClase,
   cancelarReservaClase,
   anotarListaEspera,
-  getNotificacionesClases,
-  marcarNotificacionClaseLeida
+  aceptarOfertaListaEspera
 } from '../services/claseService';
 
 const unwrap = (payload) => payload?.data ?? payload;
 const toList = (data) => Array.isArray(data) ? data : data?.data ?? [];
 
 const loadClases = async () => toList(await getClases());
-const loadNotificaciones = async () => toList(await getNotificacionesClases());
 
 export const useClases = () => {
   const { sedeSeleccionada } = useSede();
@@ -24,8 +22,6 @@ export const useClases = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
-  const [notificaciones, setNotificaciones] = useState([]);
-  const [notificationError, setNotificationError] = useState(null);
 
   const fetchClases = useCallback(async () => {
     try {
@@ -36,15 +32,6 @@ export const useClases = () => {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const fetchNotificaciones = useCallback(async () => {
-    try {
-      setNotificaciones(await loadNotificaciones());
-      setNotificationError(null);
-    } catch (err) {
-      setNotificationError(err.message);
     }
   }, []);
 
@@ -60,25 +47,6 @@ export const useClases = () => {
         if (!desmontado) setError(err.message);
       } finally {
         if (!desmontado) setLoading(false);
-      }
-    };
-
-    void cargar();
-    return () => {
-      desmontado = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let desmontado = false;
-    const cargar = async () => {
-      try {
-        const data = await loadNotificaciones();
-        if (desmontado) return;
-        setNotificaciones(data);
-        setNotificationError(null);
-      } catch (err) {
-        if (!desmontado) setNotificationError(err.message);
       }
     };
 
@@ -115,29 +83,20 @@ export const useClases = () => {
   const reservar = (id) => runAction(() => reservarClase(id));
   const cancelar = (id) => runAction(() => cancelarReservaClase(id));
   const listaEspera = (id) => runAction(() => anotarListaEspera(id));
-  const marcarNotificacionLeida = async (id) => {
-    try {
-      await marcarNotificacionClaseLeida(id);
-      await fetchNotificaciones();
-    } catch (err) {
-      setNotificationError(err.message);
-    }
-  };
+  const aceptarOferta = (id) => runAction(() => aceptarOfertaListaEspera(id));
 
   return {
     clases: clasesDeSede,
     loading,
     error,
     actionError,
-    notificaciones,
-    notificationError,
-    marcarNotificacionLeida,
     fetchClases,
     addClase,
     editClase,
     removeClase,
     reservar,
     cancelar,
-    listaEspera
+    listaEspera,
+    aceptarOferta
   };
 };
