@@ -448,3 +448,41 @@ a.member-card:hover {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Perfil en la lista y filtros */
+
+.member-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.member-info .member-profile {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--fz-primary-light);
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.member-status.is-none {
+  background: #eff1f5;
+  color: var(--fz-muted);
+}
+
+.filters-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .filters-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+}

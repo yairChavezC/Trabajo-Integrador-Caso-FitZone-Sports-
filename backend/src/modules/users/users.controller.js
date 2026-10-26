@@ -6,13 +6,19 @@ async function getUsers(req, res, next) {
     const filtros = {};
 
     if (req.query.rol !== undefined) {
-      const idRol = Number(req.query.rol);
-      if (!Number.isInteger(idRol) || idRol <= 0) {
-        const error = new Error('El parámetro rol debe ser un número entero positivo');
+      const idRoles = String(req.query.rol)
+        .split(',')
+        .map((valor) => Number(valor.trim()));
+
+      if (idRoles.some((idRol) => !Number.isInteger(idRol) || idRol <= 0)) {
+        const error = new Error(
+          'El parámetro rol debe ser uno o varios números enteros positivos separados por coma'
+        );
         error.status = 400;
+        error.statusCode = 400;
         throw error;
       }
-      filtros.idRol = idRol;
+      filtros.idRoles = idRoles;
     }
 
     const users = await service.getAllUsers(filtros);

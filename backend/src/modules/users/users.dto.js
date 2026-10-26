@@ -16,6 +16,7 @@ export function toUserResponseDTO(user) {
     nombre: user.nombre,
     dni: user.dni,
     contacto: user.contacto,
+    idRol: user.id_rol == null ? null : Number(user.id_rol),
     activo: user.activo,
     enMora: user.enMora,
     estadoSuscripcion: user.estado_suscripcion ?? null,

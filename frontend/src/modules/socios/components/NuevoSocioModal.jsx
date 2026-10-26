@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { createMember } from '../services/membersService';
+import { PERFILES_ALTA, ROL_SOCIO } from '../constants';
 import './NuevoSocioModal.css';
 
-const INITIAL = { nombre: '', dni: '', contacto: '', password: '' };
-const ROL_SOCIO = 3; // id del rol "socio" en la tabla rol
+const INITIAL = {
+  idRol: String(ROL_SOCIO),
+  nombre: '',
+  dni: '',
+  contacto: '',
+  password: '',
+};
 
 export default function NuevoSocioModal({ onClose, onCreated }) {
   const [form, setForm] = useState(INITIAL);
@@ -25,7 +31,7 @@ export default function NuevoSocioModal({ onClose, onCreated }) {
         dni: form.dni.trim(),
         contacto: form.contacto.trim(),
         password: form.password,
-        idRol: ROL_SOCIO,
+        idRol: Number(form.idRol),
       });
       await onCreated();
       onClose();
@@ -44,7 +50,7 @@ export default function NuevoSocioModal({ onClose, onCreated }) {
         aria-labelledby="nuevo-socio-title"
       >
         <div className="nuevo-socio-header">
-          <h2 id="nuevo-socio-title">Nuevo socio</h2>
+          <h2 id="nuevo-socio-title">Nuevo usuario</h2>
           <button
             type="button"
             className="nuevo-socio-close"
@@ -56,6 +62,15 @@ export default function NuevoSocioModal({ onClose, onCreated }) {
         </div>
 
         <form className="nuevo-socio-form" onSubmit={handleSubmit}>
+          <label htmlFor="idRol">Perfil</label>
+          <select id="idRol" name="idRol" value={form.idRol} onChange={handleChange}>
+            {PERFILES_ALTA.map((perfil) => (
+              <option key={perfil.id} value={perfil.id}>
+                {perfil.etiqueta}
+              </option>
+            ))}
+          </select>
+
           <label htmlFor="nombre">Nombre completo</label>
           <input id="nombre" name="nombre" value={form.nombre} onChange={handleChange} required />
 
@@ -92,7 +107,7 @@ export default function NuevoSocioModal({ onClose, onCreated }) {
               Cancelar
             </button>
             <button type="submit" className="primary-button" disabled={saving}>
-              {saving ? 'Guardando...' : 'Guardar socio'}
+              {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
         </form>

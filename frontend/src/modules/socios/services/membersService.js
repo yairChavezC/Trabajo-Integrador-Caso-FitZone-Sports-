@@ -1,9 +1,9 @@
 import { httpClient } from '../../../core/api/httpClient';
-import { ROL_SOCIO } from '../constants';
+import { PERFILES_LISTADO } from '../constants';
 
-// Solo trae usuarios con rol "socio"
+// Trae socios y clientes externos (rol 2 y 3)
 export async function getMembers() {
-  return httpClient.get('/users', { params: { rol: ROL_SOCIO } });
+  return httpClient.get('/users', { params: { rol: PERFILES_LISTADO.join(',') } });
 }
 
 export async function getMemberById(id) {

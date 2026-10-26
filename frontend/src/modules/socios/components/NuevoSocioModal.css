@@ -98,3 +98,20 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+/* Desplegable de perfil */
+
+.nuevo-socio-form select {
+  height: 42px;
+  padding: 0 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--fz-border);
+  border-radius: 8px;
+  background: white;
+  color: var(--fz-text);
+  font-size: 13px;
+}
+
+.nuevo-socio-form select:focus-visible {
+  outline: none;
+  border-color: var(--fz-primary);
+}

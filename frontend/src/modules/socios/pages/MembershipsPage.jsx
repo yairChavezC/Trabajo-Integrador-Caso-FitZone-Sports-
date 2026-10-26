@@ -13,11 +13,13 @@ import {
 import { useMembers } from '../hooks/useMembers';
 import MemberCard from '../components/MemberCard';
 import NuevoSocioModal from '../components/NuevoSocioModal';
+import { PERFILES_ALTA, ROLES } from '../constants';
 import './MembershipsPage.css';
 
 const PAGE_SIZE = 10;
 
 function getEstado(member) {
+  if (member.idRol === ROLES.CLIENTE_EXTERNO) return 'Sin membresía';
   if (!member.activo) return 'Suspendido';
   return member.enMora ? 'Vencido' : 'Activo';
 }
@@ -26,30 +28,34 @@ export default function MembershipsPage() {
   const { members, loading, error, reload } = useMembers();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [profileFilter, setProfileFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(1);
 
-  const socios = useMemo(
+  const usuarios = useMemo(
     () => members.map((m) => ({ ...m, estado: getEstado(m) })),
     [members]
   );
 
-  const total = socios.length;
-  const activos = socios.filter((s) => s.estado === 'Activo').length;
-  const vencidos = socios.filter((s) => s.estado === 'Vencido').length;
+  // Los contadores de arriba cuentan solo a los socios: los clientes externos no tienen membresía
+  const soloSocios = usuarios.filter((u) => u.idRol === ROLES.SOCIO);
+  const total = usuarios.length;
+  const activos = soloSocios.filter((s) => s.estado === 'Activo').length;
+  const vencidos = soloSocios.filter((s) => s.estado === 'Vencido').length;
 
   const metrics = [
-    { label: 'Socios registrados', context: 'En total', value: total, Icon: Users, color: 'indigo' },
+    { label: 'Socios registrados', context: 'Perfil socio', value: soloSocios.length, Icon: Users, color: 'indigo' },
     { label: 'Membresías activas', context: 'Con acceso habilitado', value: activos, Icon: BadgeCheck, color: 'green' },
     { label: 'Membresías vencidas', context: 'Pendientes de renovación', value: vencidos, Icon: Clock3, color: 'red' },
   ];
 
-  const filtered = socios.filter((s) => {
+  const filtered = usuarios.filter((u) => {
     const query = search.trim().toLowerCase();
     const matchesSearch =
-      !query || s.nombre.toLowerCase().includes(query) || String(s.dni).includes(query);
-    const matchesStatus = statusFilter === 'all' || s.estado === statusFilter;
-    return matchesSearch && matchesStatus;
+      !query || u.nombre.toLowerCase().includes(query) || String(u.dni).includes(query);
+    const matchesStatus = statusFilter === 'all' || u.estado === statusFilter;
+    const matchesProfile = profileFilter === 'all' || String(u.idRol) === profileFilter;
+    return matchesSearch && matchesStatus && matchesProfile;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -64,6 +70,11 @@ export default function MembershipsPage() {
 
   function handleStatusFilter(e) {
     setStatusFilter(e.target.value);
+    setPage(1);
+  }
+
+  function handleProfileFilter(e) {
+    setProfileFilter(e.target.value);
     setPage(1);
   }
 
@@ -114,7 +125,7 @@ export default function MembershipsPage() {
         <div className="list-toolbar">
           <div className="list-title-row">
             <div className="list-title">
-              <h2>Socios registrados</h2>
+              <h2>Socios y clientes</h2>
               <span className="count-badge">{total}</span>
             </div>
           </div>
@@ -124,32 +135,49 @@ export default function MembershipsPage() {
               <Search size={18} />
               <input
                 type="search"
-                aria-label="Buscar socios por nombre o DNI"
+                aria-label="Buscar por nombre o DNI"
                 placeholder="Buscar por nombre o DNI"
                 value={search}
                 onChange={handleSearch}
               />
             </label>
 
-            <div className="membership-filter">
-              <label htmlFor="membership-status">Membresía</label>
-              <div className="select-wrapper">
-                <select
-                  id="membership-status"
-                  value={statusFilter}
-                  onChange={handleStatusFilter}
-                >
-                  <option value="all">Todos los estados</option>
-                  <option value="Activo">Activo</option>
-                  <option value="Vencido">Vencido</option>
-                </select>
-                <ChevronDown size={15} />
+            <div className="filters-group">
+              <div className="membership-filter">
+                <label htmlFor="profile-filter">Perfil</label>
+                <div className="select-wrapper">
+                  <select id="profile-filter" value={profileFilter} onChange={handleProfileFilter}>
+                    <option value="all">Todos los perfiles</option>
+                    {PERFILES_ALTA.map((perfil) => (
+                      <option key={perfil.id} value={perfil.id}>
+                        {perfil.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={15} />
+                </div>
+              </div>
+
+              <div className="membership-filter">
+                <label htmlFor="membership-status">Membresía</label>
+                <div className="select-wrapper">
+                  <select
+                    id="membership-status"
+                    value={statusFilter}
+                    onChange={handleStatusFilter}
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="Activo">Activo</option>
+                    <option value="Vencido">Vencido</option>
+                  </select>
+                  <ChevronDown size={15} />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {loading && <p className="state-message">Cargando socios...</p>}
+        {loading && <p className="state-message">Cargando...</p>}
         {error && (
           <p className="state-message state-error">
             ⚠ No se pudo conectar con el servidor. Probá iniciar sesión de nuevo.
@@ -169,7 +197,7 @@ export default function MembershipsPage() {
               <p>
                 {total === 0
                   ? 'Agregá tu primer socio para comenzar a gestionar sus datos, membresías y acceso al gimnasio.'
-                  : 'Probá con otro nombre, DNI o estado de membresía.'}
+                  : 'Probá con otro nombre, DNI, perfil o estado de membresía.'}
               </p>
             </div>
             {total === 0 && (
@@ -191,8 +219,8 @@ export default function MembershipsPage() {
         <div className="results-footer">
           <span>
             {filtered.length === 0
-              ? '0 socios'
-              : `Mostrando ${startIndex + 1}–${startIndex + pageItems.length} de ${filtered.length} socios`}
+              ? '0 usuarios'
+              : `Mostrando ${startIndex + 1}–${startIndex + pageItems.length} de ${filtered.length} usuarios`}
           </span>
 
           {totalPages > 1 && (

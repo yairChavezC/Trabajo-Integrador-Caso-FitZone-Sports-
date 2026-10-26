@@ -7,6 +7,7 @@ import accessRoutes from './modules/accesses/routes/accessRoutes.js';
 import paymentRoutes from './modules/payments/routes/paymentRoutes.js';
 import activityRoutes from './modules/activities/routes/activityRoutes.js';
 import usersRoutes from './modules/users/users.routes.js';
+import plansRoutes from './modules/memberships/plans.routes.js';
 import reservaCanchaRoutes from './modules/reservaCancha/reservaCanchaRoutes.js';
 
 
@@ -28,5 +29,6 @@ router.use('/accesses', accessRoutes);
 router.use('/payments', paymentRoutes); // <-- Protegido nuevamente abajo de la barrera
 router.use('/clases', activityRoutes);
 router.use('/users', usersRoutes);
+router.use('/plans', plansRoutes);
 
 export default router;

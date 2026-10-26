@@ -11,13 +11,13 @@ const SELECT_USUARIO = `
   LEFT JOIN suscripcion s ON s.id_usuario = u.id
 `;
 
-async function findAll({ idRol } = {}) {
+async function findAll({ idRoles } = {}) {
   const params = [];
   let where = '';
 
-  if (idRol !== undefined && idRol !== null) {
-    params.push(idRol);
-    where = `WHERE u.id_rol = $${params.length}`;
+  if (Array.isArray(idRoles) && idRoles.length > 0) {
+    params.push(idRoles);
+    where = `WHERE u.id_rol = ANY($${params.length}::bigint[])`;
   }
 
   const result = await pool.query(
