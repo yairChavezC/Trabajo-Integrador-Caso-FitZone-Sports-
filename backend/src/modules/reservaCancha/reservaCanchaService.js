@@ -43,3 +43,14 @@ export const actualizarEstadoReserva = async (idReserva, nuevoEstado) => {
 
   return reservaActualizada;
 };
+
+
+export const obtenerReservasPorUsuario = async (idUsuario) => {
+  if (!idUsuario || isNaN(Number(idUsuario))) {
+    const error = new Error('El ID de usuario proporcionado no es válido.');
+    error.status = 400;
+    throw error;
+  }
+
+  return await reservaCanchaRepo.findReservasByUsuario(Number(idUsuario));
+};

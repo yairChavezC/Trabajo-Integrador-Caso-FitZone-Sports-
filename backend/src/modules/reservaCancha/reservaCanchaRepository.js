@@ -66,3 +66,26 @@ export const updateEstadoReserva = async (idReserva, nuevoEstado) => {
   const { rows } = await pool.query(query, [idReserva, nuevoEstado]);
   return rows[0] || null;
 };
+
+
+
+export const findReservasByUsuario = async (idUsuario) => {
+  const query = `
+    SELECT 
+      rc.id,
+      rc.id_cancha AS "idCancha",
+      c.nombre AS "nombreCancha",
+      c.tipo AS "tipoCancha",
+      rc.id_usuario AS "idUsuario",
+      rc.fecha_inicio AS "fechaInicio",
+      rc.fecha_fin AS "fechaFin",
+      rc.monto_total AS "montoTotal",
+      rc.estado
+    FROM public.reserva_cancha rc
+    LEFT JOIN public.cancha c ON c.id = rc.id_cancha
+    WHERE rc.id_usuario = $1
+    ORDER BY rc.fecha_inicio DESC;
+  `;
+  const { rows } = await pool.query(query, [idUsuario]);
+  return rows;
+};
