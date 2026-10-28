@@ -172,6 +172,35 @@ class AccessService {
             throw error;
         }
     }
+
+    // =====================================================================
+    // CONSULTAS DE ESTADO E HISTORIAL (Capa de Servicio)
+    // =====================================================================
+    /**
+     * Obtiene el aforo actual y los últimos movimientos de una sede.
+     */
+    async obtenerEstadoSede(sedeId) {
+        try {
+            const aforoActual = await accessRepository.getAforoPorSede(sedeId);
+            const ultimosMovimientos = await accessRepository.getUltimosMovimientosPorSede(sedeId);
+            return { aforoActual, ultimosMovimientos };
+        } catch (error) {
+            console.error("Error en obtenerEstadoSede (Servicio):", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtiene el historial de accesos de un usuario específico.
+     */
+    async obtenerHistorialSocio(userId) {
+        try {
+            return await accessRepository.getHistorialByUser(userId);
+        } catch (error) {
+            console.error("Error en obtenerHistorialSocio (Servicio):", error);
+            throw error;
+        }
+    }
 }
 
 export default new AccessService();

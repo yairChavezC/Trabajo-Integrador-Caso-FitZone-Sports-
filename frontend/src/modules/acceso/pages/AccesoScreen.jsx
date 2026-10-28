@@ -7,17 +7,12 @@ import { httpClient } from '../../../core/api/httpClient.js';
 import { useSede } from '../../../shared/context/SedeContext.jsx';
 import { useAuth } from '../../../core/auth/AuthContext.jsx';
 import { accesoService } from '../services/accesoService.js';
-import { SocioDashboard } from './SocioDashboard.jsx'; // 👈 Importamos la vista del socio
+import { SocioDashboard } from './SocioDashboard.jsx';
 
 export const AccesoScreen = () => {
     const { usuario } = useAuth();
-    
-    // Obtenemos el rol del usuario activo (1: Recepcionista, 3: Socio, 4: Gerente)
     const rolNumerico = Number(usuario?.rol) || Number(usuario?.id_rol) || 3;
 
-    // =================================================================
-    // ESTADOS Y LÓGICA DEL PANEL DE RECEPCIÓN (Roles 1 y 4)
-    // =================================================================
     const { loading, error, resultado, registrarIngresoUI } = useAcceso();
     const { sedeSeleccionada } = useSede();
     const sedeIdActual = sedeSeleccionada?.id || 1;
@@ -62,7 +57,6 @@ export const AccesoScreen = () => {
         }
     };
 
-    // Solo sincronizamos la recepción si NO es socio
     useEffect(() => {
         if (sedeIdActual && rolNumerico !== 3) {
             sincronizarEstadoBD(sedeIdActual);
@@ -84,26 +78,6 @@ export const AccesoScreen = () => {
         }
     };
 
-    const handleAjusteManual = (tipo) => {
-        if (tipo === 'ingreso') {
-            setAforoActual(prev => prev + 1);
-            setHistorial(prev => [{
-                id: Date.now(),
-                hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute:'2-digit', second:'2-digit' }),
-                evento: 'Ingreso Manual (Sin QR)',
-                estado: 'Autorizado'
-            }, ...prev].slice(0, 5));
-        } else if (tipo === 'salida') {
-            setAforoActual(prev => Math.max(0, prev - 1));
-            setHistorial(prev => [{
-                id: Date.now(),
-                hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute:'2-digit', second:'2-digit' }),
-                evento: 'Salida Manual',
-                estado: 'Finalizado'
-            }, ...prev].slice(0, 5));
-        }
-    };
-
     const handleIngresoExterno = async (datos) => {
         setLoadingExterno(true);
         try {
@@ -122,29 +96,25 @@ export const AccesoScreen = () => {
         }
     };
 
-    // =================================================================
-    // RENDER CONDICIONAL: ¿QUÉ VISTA LE MOSTRAMOS AL USUARIO?
-    // =================================================================
-
-    // 🔴 VISTA SOCIO: Si es rol 3, le mostramos directamente su Dashboard y cortamos la ejecución acá.
     if (rolNumerico === 3) {
         return <SocioDashboard />;
     }
 
-    // 🟢 VISTA RECEPCIÓN/GERENCIA: Si llega hasta acá, es porque es Rol 1 o 4
     return (
-        <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+        <div style={{ padding: '2rem 3rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '0.5rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f3f4f6', paddingBottom: '1rem', marginBottom: '2.5rem' }}>
                 <div>
-                    <h2 style={{ margin: 0, color: '#2c3e50' }}>Panel de Recepción</h2>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#666', fontSize: '0.9rem' }}>
-                        Sucursal activa: <strong>{sedeSeleccionada ? `${sedeSeleccionada.nombre} (${sedeSeleccionada.ciudad})` : 'Cargando...'}</strong>
+                    <h2 style={{ margin: 0, color: '#111827', fontSize: '1.8rem', fontWeight: '700' }}>Panel de Recepción</h2>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.95rem' }}>
+                        Control de accesos de <strong>{sedeSeleccionada ? `${sedeSeleccionada.nombre} (${sedeSeleccionada.ciudad})` : 'Cargando...'}</strong>
                     </p>
                 </div>
                 <button 
                     onClick={() => setShowModalExterno(true)} 
-                    style={{ padding: '0.6rem 1.2rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                    style={{ padding: '0.75rem 1.5rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
                 >
                     + Ingreso Externo
                 </button>
@@ -157,24 +127,25 @@ export const AccesoScreen = () => {
                         loading={loading} 
                     />
                     
-                    <div style={{ minHeight: '80px', marginTop: '1rem' }}>
+                    <div style={{ minHeight: '80px', marginTop: '1.5rem' }}>
                         {error && (
-                            <div style={{ padding: '1rem', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', borderLeft: '4px solid #c62828', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                                <strong>Acceso Denegado: </strong> 
+                            <div style={{ padding: '1.25rem', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '12px', borderLeft: '4px solid #ef4444', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                                <strong style={{ fontSize: '1.05rem' }}>❌ Acceso Denegado: </strong> 
                                 {typeof error === 'string' ? error : error.message}
                             </div>
                         )}
 
                         {resultado && resultado.autorizado && (
-                            <div style={{ padding: '1rem', backgroundColor: resultado.tipoAccion === 'ingreso' ? '#e8f5e9' : '#e3f2fd', color: resultado.tipoAccion === 'ingreso' ? '#2e7d32' : '#0d47a1', borderRadius: '8px', borderLeft: `5px solid ${resultado.tipoAccion === 'ingreso' ? '#2e7d32' : '#1976d2'}`, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                                <strong style={{ fontSize: '1.05rem' }}>
+                            <div style={{ padding: '1.25rem', backgroundColor: resultado.tipoAccion === 'ingreso' ? '#f0fdf4' : '#eff6ff', color: resultado.tipoAccion === 'ingreso' ? '#166534' : '#1e40af', borderRadius: '12px', borderLeft: `5px solid ${resultado.tipoAccion === 'ingreso' ? '#22c55e' : '#3b82f6'}`, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                                <strong style={{ fontSize: '1.1rem' }}>
                                     {resultado.tipoAccion === 'ingreso' ? '✅ ¡Ingreso Autorizado! ' : '👋 ¡Salida Registrada! '}
                                 </strong> 
-                                <br/>
-                                {resultado.tipoAccion === 'ingreso' 
-                                    ? 'El socio ingresó correctamente a las instalaciones. El aforo ha sumado +1.' 
-                                    : 'El socio se ha retirado de la sucursal. El aforo se ha liberado en -1.'
-                                }
+                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem' }}>
+                                    {resultado.tipoAccion === 'ingreso' 
+                                        ? 'El socio ingresó correctamente a las instalaciones. El aforo ha sumado +1.' 
+                                        : 'El socio se ha retirado de la sucursal. El aforo se ha liberado en -1.'
+                                    }
+                                </p>
                             </div>
                         )}
                     </div>
@@ -184,39 +155,38 @@ export const AccesoScreen = () => {
                     <AforoCard 
                         aforoActual={aforoActual} 
                         aforoMaximo={100} 
-                        onAjusteManual={handleAjusteManual}
                     />
                 </div>
             </div>
 
-            <div style={{ marginTop: '2rem', border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderBottom: '1px solid #eee' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#495057' }}>Últimos Movimientos en Puerta</h3>
+            <div style={{ marginTop: '2.5rem', border: '1px solid #e5e7eb', borderRadius: '16px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ backgroundColor: '#f9fafb', padding: '1.25rem', borderBottom: '1px solid #e5e7eb' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#1f2937', fontWeight: '600' }}>Últimos Movimientos en Puerta</h3>
                 </div>
                 
                 {historial.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#adb5bd' }}>
+                    <div style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af', fontSize: '1rem' }}>
                         No hay ingresos recientes registrados en esta sucursal.
                     </div>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead>
-                            <tr style={{ backgroundColor: '#fdfdfd', color: '#6c757d', fontSize: '0.9rem' }}>
-                                <th style={{ padding: '12px 1rem', borderBottom: '2px solid #eee' }}>Hora</th>
-                                <th style={{ padding: '12px 1rem', borderBottom: '2px solid #eee' }}>Evento</th>
-                                <th style={{ padding: '12px 1rem', borderBottom: '2px solid #eee' }}>Estado</th>
+                            <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>Hora</th>
+                                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>Evento</th>
+                                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>Estado</th>
                             </tr>
                         </thead>
                         <tbody>
                             {historial.map((mov) => (
-                                <tr key={mov.id} style={{ borderBottom: '1px solid #eee' }}>
-                                    <td style={{ padding: '12px 1rem', fontWeight: '500', color: '#495057' }}>{mov.hora}</td>
-                                    <td style={{ padding: '12px 1rem', color: '#212529' }}>{mov.evento}</td>
-                                    <td style={{ padding: '12px 1rem' }}>
+                                <tr key={mov.id} style={{ borderBottom: '1px solid #f3f4f6', transition: 'background-color 0.2s' }}>
+                                    <td style={{ padding: '1rem 1.5rem', fontWeight: '600', color: '#374151' }}>{mov.hora}</td>
+                                    <td style={{ padding: '1rem 1.5rem', color: '#4b5563' }}>{mov.evento}</td>
+                                    <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                                         <span style={{
-                                            padding: '4px 8px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold',
-                                            backgroundColor: mov.estado === 'Autorizado' ? '#e8f5e9' : '#e3f2fd',
-                                            color: mov.estado === 'Autorizado' ? '#2e7d32' : '#0d47a1'
+                                            padding: '4px 12px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700',
+                                            backgroundColor: mov.estado === 'Autorizado' ? '#dcfce7' : mov.estado === 'Finalizado' ? '#e0e7ff' : '#fee2e2',
+                                            color: mov.estado === 'Autorizado' ? '#166534' : mov.estado === 'Finalizado' ? '#3730a3' : '#b91c1c'
                                         }}>
                                             {mov.estado}
                                         </span>

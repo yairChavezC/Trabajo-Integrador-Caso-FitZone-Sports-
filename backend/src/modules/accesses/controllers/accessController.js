@@ -1,6 +1,6 @@
 import { ValidateAccessDTO } from '../dtos/access.dto.js';
 import accessService from '../services/accessService.js';
-import accessRepository from '../repositories/accessRepository.js'; 
+// 🗑️ ELIMINAMOS la importación de accessRepository. ¡El controlador ya no habla con la base de datos!
 
 class AccessController {
     
@@ -45,18 +45,17 @@ class AccessController {
         }
     }
 
+    // 👇 LLAMAMOS AL SERVICIO EN LUGAR DEL REPOSITORIO
     async obtenerEstadoSede(req, res) {
         try {
             const { sedeId } = req.params;
-            const aforoActual = await accessRepository.getAforoPorSede(sedeId);
-            const ultimosMovimientos = await accessRepository.getUltimosMovimientosPorSede(sedeId);
-            return res.status(200).json({ success: true, data: { aforoActual, ultimosMovimientos } });
+            const estado = await accessService.obtenerEstadoSede(sedeId);
+            return res.status(200).json({ success: true, data: estado });
         } catch (error) {
             return res.status(500).json({ success: false, mensaje: "Error del servidor" });
         }
     }
 
-    // 👇 AHORA SÍ ESTÁ ADENTRO DE LA CLASE
     async registrarExterno(req, res) {
         try {
             const { nombre, dni, sedeId } = req.body;
@@ -70,15 +69,16 @@ class AccessController {
         }
     }
 
-    // =====================================================================
-    // HISTORIAL DEL SOCIO (Para el Dashboard)
-    // =====================================================================
+    // 👇 LLAMAMOS AL SERVICIO EN LUGAR DEL REPOSITORIO
     async obtenerHistorialSocio(req, res) {
         try {
-            // Obtenemos el ID del socio (Idealmente desde un token JWT, pero por ahora lo sacamos del query o hardcodeamos)
-            const userId = req.query.userId || 10; // 10 es el ID de Luis Advíncula según tu base de datos
+            const userId = req.usuario?.id; 
 
-            const historial = await accessRepository.getHistorialByUser(userId);
+            if (!userId) {
+                return res.status(401).json({ success: false, mensaje: "Usuario no autenticado." });
+            }
+
+            const historial = await accessService.obtenerHistorialSocio(userId);
 
             return res.status(200).json({
                 success: true,
