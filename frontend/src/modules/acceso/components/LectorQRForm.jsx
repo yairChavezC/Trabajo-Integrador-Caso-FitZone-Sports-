@@ -1,55 +1,100 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export const LectorQRForm = ({ onEscanear, loading }) => {
     const [qrCode, setQrCode] = useState('');
+    const inputRef = useRef(null);
+
+    // Mantiene el foco automático para la pistola lectora de QR
+    useEffect(() => {
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, []);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
-        // Evitamos enviar si el input está vacío
         if (qrCode.trim() === '') return;
         
-        // Ejecutamos la función que nos pasan por "prop" (que luego conectaremos al Hook)
         onEscanear(qrCode);
-        
-        // Vaciamos el input simulando que el molinete ya está listo para el siguiente socio
         setQrCode(''); 
+        
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
     };
 
     return (
         <div style={{ 
-            padding: '1.5rem', 
-            border: '2px dashed #ccc', 
-            borderRadius: '8px',
-            backgroundColor: '#f9f9f9'
+            padding: '2rem', 
+            border: '1px solid #e5e7eb', 
+            borderRadius: '16px',
+            backgroundColor: '#ffffff',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+            boxSizing: 'border-box'
         }}>
-            <h3 style={{ marginTop: 0 }}>Simulador de Molinete (RF-04)</h3>
-            <p style={{ fontSize: '0.9rem', color: '#555' }}>
-                Ingrese el código QR del socio para autorizar el ingreso.
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', gap: '0.75rem' }}>
+                <div style={{ 
+                    width: '45px', 
+                    height: '45px', 
+                    backgroundColor: '#eef2ff', 
+                    borderRadius: '10px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '1.4rem'
+                }}>
+                    📷
+                </div>
+                <div>
+                    <h3 style={{ margin: 0, color: '#1f2937', fontSize: '1.25rem', fontWeight: '600' }}>
+                        Lector de Accesos
+                    </h3>
+                    <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '0.2rem 0 0 0' }}>
+                        Escaneá el código QR del socio para registrar automáticamente su entrada o salida.
+                    </p>
+                </div>
+            </div>
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
                 <input 
+                    ref={inputRef}
                     type="text" 
                     value={qrCode}
                     onChange={(e) => setQrCode(e.target.value)}
-                    placeholder="Ej: qr-dinamico-xyz123"
+                    placeholder="Esperando lectura del escáner..."
                     disabled={loading}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    autoComplete="off"
+                    style={{ 
+                        flex: 1, 
+                        padding: '0.75rem 1rem', 
+                        borderRadius: '8px', 
+                        border: '2px solid #e5e7eb',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        color: '#1f2937'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#4f46e5'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                 />
                 <button 
                     type="submit" 
                     disabled={loading}
                     style={{ 
-                        padding: '0.5rem 1rem', 
-                        backgroundColor: '#007bff', 
+                        padding: '0.75rem 1.5rem', 
+                        backgroundColor: '#4f46e5', 
                         color: 'white', 
                         border: 'none', 
-                        borderRadius: '4px',
-                        cursor: loading ? 'not-allowed' : 'pointer'
+                        borderRadius: '8px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        transition: 'background-color 0.2s'
                     }}
+                    onMouseOver={(e) => !loading && (e.target.style.backgroundColor = '#4338ca')}
+                    onMouseOut={(e) => !loading && (e.target.style.backgroundColor = '#4f46e5')}
                 >
-                    {loading ? 'Validando...' : 'Escanear QR'}
+                    {loading ? 'Validando...' : 'Escanear'}
                 </button>
             </form>
         </div>

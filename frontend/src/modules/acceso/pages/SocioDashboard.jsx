@@ -18,10 +18,11 @@ export const SocioDashboard = () => {
   const [loadingCanchas, setLoadingCanchas] = useState(true);
   const [loadingClases, setLoadingClases] = useState(true);
 
-  useEffect(() => {
+useEffect(() => {
     const fetchActividadExtra = async () => {
+      // 1. Petición de canchas (Ya funciona)
       try {
-        const resCanchas = await httpClient.get(`/canchas/mis-reservas?userId=${userId}`).catch(() => ({ data: [] }));
+        const resCanchas = await httpClient.get('/reservas-canchas/mis-reservas').catch(() => ({ data: [] }));
         const dataCanchas = resCanchas?.data?.data || resCanchas?.data || [];
         setCanchasReservadas(Array.isArray(dataCanchas) ? dataCanchas.slice(0, 5) : []);
       } catch (e) {
@@ -30,8 +31,9 @@ export const SocioDashboard = () => {
         setLoadingCanchas(false);
       }
 
+      // 2. 👈 Petición REAL a tus clases grupales
       try {
-        const resClases = await httpClient.get(`/clases/mis-clases?userId=${userId}`).catch(() => ({ data: [] }));
+        const resClases = await httpClient.get('/clases/mis-inscripciones').catch(() => ({ data: [] }));
         const dataClases = resClases?.data?.data || resClases?.data || [];
         setClasesReservadas(Array.isArray(dataClases) ? dataClases.slice(0, 5) : []);
       } catch (e) {
@@ -135,17 +137,42 @@ export const SocioDashboard = () => {
                     </td>
                   </tr>
                 ) : (
-                  canchasReservadas.map((c) => (
-                    <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '500', color: '#111827' }}>{c.nombre_cancha || c.cancha || 'Cancha'}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#4b5563' }}>{c.fecha || c.horario || '---'}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700', background: '#dcfce7', color: '#166534' }}>
-                          Confirmada
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  canchasReservadas.map((c) => {
+                    // Mapeo dinámico de estados con sus respectivos colores
+                    const estadoText = c.estado ? c.estado.charAt(0).toUpperCase() + c.estado.slice(1) : 'Confirmada';
+                    const colorFondo = c.estado === 'cancelada' ? '#fee2e2' : c.estado === 'pendiente' ? '#fef3c7' : '#dcfce7';
+                    const colorTexto = c.estado === 'cancelada' ? '#b91c1c' : c.estado === 'pendiente' ? '#d97706' : '#166534';
+
+                    return (
+                      <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        {/* 👈 nombreCancha tal cual llega del backend */}
+                        <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '500', color: '#111827' }}>
+                          {c.nombreCancha || 'Cancha'}
+                        </td>
+                        
+                        {/* 👈 fechaInicio formateada a DD/MM/YYYY HH:MM */}
+                        <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#4b5563' }}>
+                          {c.fechaInicio ? new Date(c.fechaInicio).toLocaleString('es-AR', { 
+                            dateStyle: 'short', 
+                            timeStyle: 'short' 
+                          }) : '---'}
+                        </td>
+                        
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <span style={{ 
+                            padding: '4px 10px', 
+                            borderRadius: '99px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: '700', 
+                            background: colorFondo, 
+                            color: colorTexto 
+                          }}>
+                            {estadoText}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
