@@ -15,6 +15,7 @@ import MemberCard from '../components/MemberCard';
 import NuevoSocioModal from '../components/NuevoSocioModal';
 import { PERFILES_ALTA, ROLES } from '../constants';
 import './MembershipsPage.css';
+import { Link } from 'react-router-dom';
 
 const PAGE_SIZE = 10;
 
@@ -98,9 +99,14 @@ export default function MembershipsPage() {
               Administrá los socios y sus membresías en un solo lugar.
             </p>
           </div>
-          <button className="primary-button" type="button" onClick={handleNuevoSocio}>
-            + Nuevo socio
-          </button>
+          <div className="title-actions">
+            <Link to="/socios/planes" className="secondary-button">
+              Planes
+            </Link>
+            <button className="primary-button" type="button" onClick={handleNuevoSocio}>
+              + Nuevo socio
+            </button>
+          </div>
         </div>
       </section>
 

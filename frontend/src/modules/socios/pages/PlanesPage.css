@@ -1,0 +1,205 @@
+.planes-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px 48px;
+  color: #171a23;
+}
+
+.planes-page *,
+.planes-page *::before,
+.planes-page *::after {
+  box-sizing: border-box;
+}
+
+.planes-page h1,
+.planes-page h2,
+.planes-page p {
+  margin: 0;
+}
+
+/* Encabezado */
+
+.planes-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.planes-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #717887;
+  font-size: 12px;
+}
+
+.planes-breadcrumb a {
+  color: #717887;
+  text-decoration: none;
+}
+
+.planes-breadcrumb a:hover {
+  color: #171a23;
+}
+
+.planes-breadcrumb-current {
+  color: #171a23;
+}
+
+.planes-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.planes-title-row h1 {
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 36px;
+}
+
+.planes-description {
+  margin-top: 8px !important;
+  color: #717887;
+  font-size: 14px;
+}
+
+.planes-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Botones (también los usa el formulario de planes) */
+
+.planes-btn {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.planes-btn-primary {
+  height: 42px;
+  border: 0;
+  background: #6366f1;
+  color: white;
+}
+
+.planes-btn-secondary {
+  border: 1px solid #e8ebf0;
+  background: white;
+  color: #171a23;
+}
+
+.planes-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Tarjetas de planes */
+
+.planes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px;
+  border-radius: 12px;
+  background: white;
+}
+
+.plan-card.is-inactive {
+  opacity: 0.65;
+}
+
+.plan-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plan-card-top h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.plan-status {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.plan-status.is-active {
+  background: #eaf7f0;
+  color: #169768;
+}
+
+.plan-status.is-inactive {
+  background: #eff1f5;
+  color: #717887;
+}
+
+.plan-price {
+  margin-top: 12px !important;
+  font-size: 26px;
+}
+
+.plan-detail {
+  color: #717887;
+  font-size: 13px;
+}
+
+.plan-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* Mensajes */
+
+.planes-state {
+  padding: 40px 24px;
+  color: #717887;
+  font-size: 14px;
+  text-align: center;
+}
+
+.planes-error {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #feeeee;
+  color: #e34c4c;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .planes-page {
+    padding: 28px 20px;
+  }
+
+  .planes-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
