@@ -26,5 +26,18 @@ export class ConsoleWaitlistObserver {
   }
 }
 
+export class NotificationWaitlistObserver {
+  async update(evento) {
+    try {
+      const { createWaitlistPromotion } = await import('../repositories/notificationRepository.js');
+      await createWaitlistPromotion(evento);
+    } catch (err) {
+      // Si la tabla no está creada aún en la BD o falla la persistencia, se registra en log sin interrumpir el flujo
+      console.warn('[Observer/Notificaciones] No se pudo guardar la notificación persistente:', err.message);
+    }
+  }
+}
+
 export const classWaitlistSubject = new WaitlistSubject();
 classWaitlistSubject.subscribe(new ConsoleWaitlistObserver());
+classWaitlistSubject.subscribe(new NotificationWaitlistObserver());

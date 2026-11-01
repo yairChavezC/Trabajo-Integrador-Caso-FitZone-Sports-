@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getInscripcionesClase } from '../services/claseService';
 
 function estadoLabel(inscripcion) {
   if (!inscripcion) return null;
@@ -39,6 +40,30 @@ export default function ClaseTable({
   modoAdministracion = false
 }) {
   const [ahora, setAhora] = useState(() => Date.now());
+  const [inscriptosPorClase, setInscriptosPorClase] = useState({});
+  const [cargandoInscriptos, setCargandoInscriptos] = useState({});
+
+  const toggleInscriptos = async (idClase) => {
+    if (inscriptosPorClase[idClase]) {
+      setInscriptosPorClase((prev) => {
+        const next = { ...prev };
+        delete next[idClase];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      setCargandoInscriptos((prev) => ({ ...prev, [idClase]: true }));
+      const res = await getInscripcionesClase(idClase);
+      const lista = res?.data ?? (Array.isArray(res) ? res : []);
+      setInscriptosPorClase((prev) => ({ ...prev, [idClase]: lista }));
+    } catch (err) {
+      alert('No se pudieron cargar los inscriptos: ' + err.message);
+    } finally {
+      setCargandoInscriptos((prev) => ({ ...prev, [idClase]: false }));
+    }
+  };
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setAhora(Date.now()), 60000);
@@ -138,6 +163,18 @@ export default function ClaseTable({
               )}
               {modoAdministracion && (
                 <>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => toggleInscriptos(clase.id)}
+                    disabled={cargandoInscriptos[clase.id]}
+                  >
+                    {cargandoInscriptos[clase.id]
+                      ? 'Cargando...'
+                      : inscriptosPorClase[clase.id]
+                        ? 'Ocultar inscriptos'
+                        : 'Ver inscriptos'}
+                  </button>
                   <button type="button" className="btn-secondary" onClick={() => onEdit(clase)}>
                     Editar
                   </button>
@@ -147,6 +184,31 @@ export default function ClaseTable({
                 </>
               )}
             </div>
+            {modoAdministracion && inscriptosPorClase[clase.id] && (
+              <div style={{ marginTop: '0.8rem', padding: '0.8rem', background: '#f8fafc', borderRadius: '10px', fontSize: '0.85rem' }}>
+                <strong style={{ display: 'block', marginBottom: '0.4rem', color: '#0f172a' }}>
+                  Participantes ({inscriptosPorClase[clase.id].length}):
+                </strong>
+                {inscriptosPorClase[clase.id].length === 0 ? (
+                  <p style={{ margin: 0, color: '#64748b' }}>No hay inscriptos aún.</p>
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#334155' }}>
+                    {inscriptosPorClase[clase.id].map((ins) => (
+                      <li key={ins.id} style={{ marginBottom: '0.25rem' }}>
+                        <strong>{ins.nombreUsuario || `Usuario #${ins.idUsuario}`}</strong>
+                        {ins.dniUsuario && ` (DNI: ${ins.dniUsuario})`} —{' '}
+                        <span style={{
+                          fontWeight: 600,
+                          color: ins.estado === 'confirmado' ? '#0f766e' : ins.estado === 'en espera' ? '#b45309' : '#475569'
+                        }}>
+                          {ins.estado}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </article>
         );
       })}
