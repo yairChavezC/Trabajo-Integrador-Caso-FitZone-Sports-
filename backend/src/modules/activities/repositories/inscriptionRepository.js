@@ -239,10 +239,20 @@ export const acceptWaitlistOffer = async (idClase, idUsuario, client = pool) => 
 export const listByClass = async (idClase, client = pool) => {
   const { rows } = await client.query(
     `
-      SELECT ${inscriptionSelect}
-      FROM public.inscripciones_clase_grupal
-      WHERE id_clase_grupal = $1
-      ORDER BY fecha_registro ASC
+      SELECT
+        i.id,
+        i.id_clase_grupal AS "idClase",
+        i.id_usuario AS "idUsuario",
+        u.nombre AS "nombreUsuario",
+        u.dni AS "dniUsuario",
+        u.contacto AS "contactoUsuario",
+        i.estado,
+        i.fecha_registro AS "fechaRegistro",
+        i.fecha_expiracion_oferta AS "fechaExpiracionOferta"
+      FROM public.inscripciones_clase_grupal i
+      LEFT JOIN public.usuario u ON u.id = i.id_usuario
+      WHERE i.id_clase_grupal = $1
+      ORDER BY i.fecha_registro ASC, i.id ASC
     `,
     [idClase]
   );

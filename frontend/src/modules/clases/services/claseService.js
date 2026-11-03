@@ -39,3 +39,11 @@ export const anotarListaEspera = async (id) => {
 export const aceptarOfertaListaEspera = async (id) => {
   return httpClient.post(`/clases/${id}/lista-espera/aceptar`);
 };
+
+export const getMisInscripciones = async () => {
+  return httpClient.get('/clases/mis-inscripciones');
+};
+
+export const getInscripcionesClase = async (id) => {
+  return httpClient.get(`/clases/${id}/inscripciones`);
+};

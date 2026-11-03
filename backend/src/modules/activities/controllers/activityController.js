@@ -37,12 +37,20 @@ const getUserId = (req) => {
 export const getActivities = async (req, res) => {
   try {
     const tipo = await getCurrentUserRole(req.usuario?.rol);
-    const idSede = tipo === 'recepcionista'
-      ? await getAssignedSiteForUser(getUserId(req))
-      : null;
-    if (tipo === 'recepcionista' && !idSede) {
-      return res.status(403).json({ message: 'Tu perfil no tiene una sede asignada.' });
+    let idSede = null;
+
+    if (tipo === 'recepcionista') {
+      idSede = await getAssignedSiteForUser(getUserId(req));
+      if (!idSede) {
+        return res.status(403).json({ message: 'Tu perfil no tiene una sede asignada.' });
+      }
+    } else if (req.query.idSede) {
+      const parsedSede = Number(req.query.idSede);
+      if (Number.isInteger(parsedSede) && parsedSede > 0) {
+        idSede = parsedSede;
+      }
     }
+
     const activities = await getAllActivities(getUserId(req), idSede);
     return res.status(200).json(activities);
   } catch (error) {

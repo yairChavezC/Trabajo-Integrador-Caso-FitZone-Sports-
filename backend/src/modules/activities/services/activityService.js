@@ -225,8 +225,22 @@ export const deleteActivity = async (id) => {
       throw new Error('El ID de la clase es obligatorio.');
     }
 
+    const confirmados = await countConfirmed(id);
+    if (confirmados > 0) {
+      throw new BusinessError(
+        `No se puede eliminar la clase porque cuenta con ${confirmados} reserva(s) activa(s). Cancelá las inscripciones primero.`,
+        409
+      );
+    }
+
     return await deleteActivityInRepo(id);
   } catch (error) {
+    if (error.code === '23503') {
+      throw new BusinessError(
+        'No se puede eliminar la clase porque cuenta con registros históricos de inscripciones asociadas.',
+        409
+      );
+    }
     console.error('Error en activityService.deleteActivity:', error);
     throw error;
   }
