@@ -9,7 +9,7 @@ import activityRoutes from './modules/activities/routes/activityRoutes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import plansRoutes from './modules/memberships/plans.routes.js';
 import reservaCanchaRoutes from './modules/reservaCancha/reservaCanchaRoutes.js';
-
+import subscriptionsRoutes from './modules/memberships/subscriptions.routes.js';
 
 const router = Router();
 
@@ -30,5 +30,6 @@ router.use('/payments', paymentRoutes); // <-- Protegido nuevamente abajo de la 
 router.use('/clases', activityRoutes);
 router.use('/users', usersRoutes);
 router.use('/plans', plansRoutes);
+router.use('/memberships', subscriptionsRoutes);
 
 export default router;

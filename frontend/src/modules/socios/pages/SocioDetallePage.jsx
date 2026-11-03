@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, BadgeCheck, ChevronRight, Info, User } from 'lucide-react';
 import { getMemberById } from '../services/membersService';
+import RenovarMembresiaModal from '../components/RenovarMembresiaModal';
 import './SocioDetallePage.css';
 
 function formatFecha(valor, timeZone) {
@@ -52,10 +53,10 @@ export default function SocioDetallePage() {
   const [socio, setSocio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showRenovar, setShowRenovar] = useState(false);
 
-  useEffect(() => {
-    setLoading(true);
-    getMemberById(id)
+  const cargarSocio = useCallback(() => {
+    return getMemberById(id)
       .then((data) => {
         setSocio(data);
         setError(null);
@@ -63,6 +64,11 @@ export default function SocioDetallePage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    setLoading(true);
+    cargarSocio();
+  }, [cargarSocio]);
 
   if (loading) {
     return (
@@ -195,8 +201,7 @@ export default function SocioDetallePage() {
             <button
               type="button"
               className="detalle-btn detalle-btn-primary"
-              disabled
-              title="Próximamente"
+              onClick={() => setShowRenovar(true)}
             >
               Renovar membresía
             </button>
@@ -209,6 +214,14 @@ export default function SocioDetallePage() {
           </section>
         </aside>
       </div>
+
+      {showRenovar && (
+        <RenovarMembresiaModal
+          socio={socio}
+          onClose={() => setShowRenovar(false)}
+          onRenovado={cargarSocio}
+        />
+      )}
     </main>
   );
 }
