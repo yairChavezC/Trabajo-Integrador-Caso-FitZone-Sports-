@@ -27,10 +27,14 @@ export class ConsoleWaitlistObserver {
 }
 
 export class NotificationWaitlistObserver {
+  constructor(notificationRepo = null) {
+    this.notificationRepo = notificationRepo;
+  }
+
   async update(evento) {
     try {
-      const { createWaitlistPromotion } = await import('../repositories/notificationRepository.js');
-      await createWaitlistPromotion(evento);
+      const repo = this.notificationRepo || (await import('../repositories/notificationRepository.js'));
+      await repo.createWaitlistPromotion(evento);
     } catch (err) {
       // Si la tabla no está creada aún en la BD o falla la persistencia, se registra en log sin interrumpir el flujo
       console.warn('[Observer/Notificaciones] No se pudo guardar la notificación persistente:', err.message);

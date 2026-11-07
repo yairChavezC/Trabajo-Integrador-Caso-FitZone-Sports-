@@ -92,7 +92,9 @@ export default function ClaseTable({
         const horasRestantes = horasHastaInicio(clase.fechaInicio, ahora);
         const reservaHabilitada = horasRestantes > 0 && horasRestantes <= 48;
         const listaEsperaHabilitada = horasRestantes > 0;
-        const cancelacionHabilitada = horasRestantes >= 2;
+        const cancelacionHabilitada = mia?.estado === 'confirmado'
+          ? horasRestantes >= 2
+          : horasRestantes > 0;
 
         return (
           <article key={clase.id} className="clase-card">
@@ -151,14 +153,24 @@ export default function ClaseTable({
                   type="button"
                   className="btn-secondary"
                   disabled={!cancelacionHabilitada}
-                  title={!cancelacionHabilitada ? 'La cancelación cierra 2 h antes del inicio.' : undefined}
+                  title={
+                    !cancelacionHabilitada
+                      ? (mia?.estado === 'confirmado'
+                          ? 'La cancelación de reservas confirmadas cierra 2 h antes del inicio.'
+                          : 'La clase ya comenzó.')
+                      : undefined
+                  }
                   onClick={() => onCancelar(clase.id)}
                 >
                   {cancelacionHabilitada
-                    ? mia.estado === 'notificado'
-                      ? 'Rechazar lugar ofrecido'
-                      : 'Cancelar inscripción'
-                    : 'Cancelación cerrada (menos de 2 h)'}
+                    ? (mia.estado === 'notificado'
+                        ? 'Rechazar lugar ofrecido'
+                        : mia.estado === 'en espera'
+                          ? 'Salir de la lista de espera'
+                          : 'Cancelar reserva')
+                    : (mia?.estado === 'confirmado'
+                        ? 'Cancelación cerrada (menos de 2 h)'
+                        : 'Clase comenzada')}
                 </button>
               )}
               {modoAdministracion && (

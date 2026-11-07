@@ -25,7 +25,7 @@ export const createWaitlistPromotion = async (evento, client = pool) => {
     `,
     [
       evento.idUsuario,
-      `Se liberó un lugar en ${evento.nombreClase}. Tu inscripción quedó confirmada.`,
+      `Se liberó un lugar en ${evento.nombreClase}. Tenés una oferta temporal disponible para confirmar tu reserva.`,
       evento.idClase,
       evento.idInscripcion
     ]
