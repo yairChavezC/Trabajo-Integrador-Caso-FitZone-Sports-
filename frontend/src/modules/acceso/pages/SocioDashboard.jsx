@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../core/auth/AuthContext';
-import { useHistorialSocio } from '../hooks/useHistorialSocio';
+import { useHistorialSocio } from '../hooks/UseHistorialSocio';
 import { HistorialAccesosTable } from '../components/HistorialAccesosTable';
 import { httpClient } from '../../../core/api/httpClient';
 
