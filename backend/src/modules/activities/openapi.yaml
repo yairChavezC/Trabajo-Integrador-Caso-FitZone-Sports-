@@ -19,20 +19,20 @@ paths:
           name: idSede
           schema:
             type: integer
-          description: Sede opcional para administradores y gerentes; recepcionistas ven su sede asignada.
+          description: Sede opcional para gerentes; recepcionistas ven su sede asignada.
         - in: query
           name: incluirPasadas
           schema:
             type: boolean
             default: false
-          description: Administradores y gerentes pueden incluir clases finalizadas.
+          description: Gerentes pueden incluir clases finalizadas.
       responses:
         '200':
           description: Lista de clases.
     post:
       tags: [Clases grupales]
       summary: Crear una clase
-      description: Requiere rol administrador o gerente, o recepcionista asignado a la sede indicada.
+      description: Requiere rol gerente o recepcionista asignado a la sede indicada.
       requestBody:
         required: true
         content:
@@ -121,7 +121,7 @@ paths:
     get:
       tags: [Clases grupales]
       summary: Listar inscripciones de una clase
-      description: Requiere rol administrador o gerente, o recepcionista de la sede de la clase.
+      description: Requiere rol gerente o recepcionista de la sede de la clase.
       parameters:
         - $ref: '#/components/parameters/ClassId'
       responses:

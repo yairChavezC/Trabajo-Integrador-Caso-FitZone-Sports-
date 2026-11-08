@@ -85,11 +85,11 @@ test('Permisos Módulo 3: Socio no puede crear ni eliminar clases', async () => 
   }
 });
 
-test('Permisos Módulo 3: Gerente/Admin tiene acceso habilitado para gestión', async () => {
+test('Permisos Módulo 3: gerente tiene acceso habilitado para gestión', async () => {
   const app = express();
   app.use(express.json());
   app.use((req, res, next) => {
-    req.usuario = { id: 1, rol: 4 }; // gerente / admin
+    req.usuario = { id: 1, rol: 4 };
     next();
   });
   app.use('/api/v1/clases', activityRouter);

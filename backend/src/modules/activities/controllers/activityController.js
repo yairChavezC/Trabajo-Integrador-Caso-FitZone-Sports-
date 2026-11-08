@@ -43,7 +43,7 @@ export const getActivities = async (req, res) => {
     let idSede = null;
     const incluirPasadas =
       req.query.incluirPasadas === 'true' &&
-      ['administrador', 'gerente'].includes(tipo);
+      tipo === 'gerente';
 
     if (tipo === 'recepcionista') {
       idSede = await getAssignedSiteForUser(getUserId(req));

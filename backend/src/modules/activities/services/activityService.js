@@ -127,7 +127,8 @@ export const createActivityService = (dependencies = {}) => {
     if (!idRol) {
       throw new BusinessError('El rol autenticado es obligatorio.', 401);
     }
-    return activityRepo.findRoleTypeById(idRol);
+    const tipo = await activityRepo.findRoleTypeById(idRol);
+    return tipo === 'administrador' ? 'gerente' : tipo;
   };
 
   const getAssignedSiteForUser = async (idUsuario) => {

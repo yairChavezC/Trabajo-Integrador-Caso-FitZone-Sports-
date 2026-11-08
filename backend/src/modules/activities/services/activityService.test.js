@@ -21,7 +21,11 @@ const createMockDependencies = (overrides = {}) => {
     findActivityById: async (id) => ({ ...defaultClass, id }),
     findAllActivities: async () => [{ ...defaultClass }],
     findMyRegistrations: async () => [],
-    findRoleTypeById: async (idRol) => (idRol === 3 ? 'socio' : 'gerente'),
+    findRoleTypeById: async (idRol) => ({
+      1: 'administrador',
+      3: 'socio',
+      4: 'gerente'
+    })[idRol] ?? null,
     findAssignedSiteByUser: async () => 1,
     createActivity: async (dto) => ({ id: 99, ...dto }),
     updateActivity: async (id, dto) => ({ id, ...dto }),
@@ -95,6 +99,13 @@ test('Reserva: requiere usuario autenticado', async () => {
     async () => service.reserveClass(1, null),
     (err) => err instanceof BusinessError && err.status === 401
   );
+});
+
+test('el rol administrador se expone como gerente en el módulo de clases', async () => {
+  const { service } = createMockDependencies();
+
+  assert.equal(await service.getCurrentUserRole(1), 'gerente');
+  assert.equal(await service.getCurrentUserRole(4), 'gerente');
 });
 
 test('Reserva: con membresía activa confirma el cupo correctamente', async () => {

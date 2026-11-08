@@ -30,9 +30,9 @@ export const createRequireAgendaManager = ({
 } = {}) => async (req, res, next) => {
   try {
     const tipo = await resolveRole(req.usuario?.rol);
-    if (tipo === 'administrador' || tipo === 'gerente') return next();
+    if (tipo === 'gerente') return next();
     if (tipo !== 'recepcionista') {
-      return res.status(403).json({ message: 'Se requiere rol de administración de sede o gerencia.' });
+      return res.status(403).json({ message: 'Se requiere rol gerente o recepcionista asignado a sede.' });
     }
 
     const idUsuario = Number(req.usuario?.id);
@@ -91,7 +91,7 @@ const requireRoles = (rolesPermitidos, mensaje) => async (req, res, next) => {
 };
 
 const requireClassAccess = requireRoles(
-  ['socio', 'recepcionista', 'administrador', 'gerente'],
+  ['socio', 'recepcionista', 'gerente'],
   'La agenda de clases está disponible para socios y personal de FitZone.'
 );
 const requireAgendaManager = createRequireAgendaManager();
