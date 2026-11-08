@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import activityRouter from './activityRoutes.js';
+import activityRouter, { createRequireAgendaManager } from './activityRoutes.js';
 
 // Simulador de request y respuesta para probar autorización de rutas
 const createMockReqRes = (usuario, method = 'GET', path = '/', body = {}, params = {}) => {
@@ -105,4 +105,27 @@ test('Permisos Módulo 3: Gerente/Admin tiene acceso habilitado para gestión', 
   } finally {
     server.close();
   }
+});
+
+test('Permisos Módulo 3: recepcionista no puede mover una clase a otra sede', async () => {
+  const requireAgendaManager = createRequireAgendaManager({
+    getCurrentUserRole: async () => 'recepcionista',
+    getAssignedSiteForUser: async () => 1,
+    getActivityById: async () => ({ id: 12, idSede: 1 })
+  });
+  const { req, res } = createMockReqRes(
+    { id: 20, rol: 5 },
+    'PUT',
+    '/12',
+    { idSede: 2 },
+    { id: '12' }
+  );
+  let continued = false;
+
+  await requireAgendaManager(req, res, () => {
+    continued = true;
+  });
+
+  assert.equal(res.getStatusCode(), 403);
+  assert.equal(continued, false);
 });

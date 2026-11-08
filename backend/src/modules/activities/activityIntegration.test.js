@@ -1,12 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import pool from '../../config/db.js';
-import * as activityService from './services/activityService.js';
 import { BusinessError } from './errors.js';
 
-test('Integración Real con PostgreSQL/Supabase - Módulo 3 Clases Grupales', async (t) => {
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+
+const databaseIdentity = (connectionString) => {
+  const url = new URL(connectionString);
+  const protocol = url.protocol === 'postgresql:' ? 'postgres:' : url.protocol;
+  const port = url.port || '5432';
+  return `${protocol}//${url.hostname}:${port}${url.pathname}`;
+};
+
+test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
+  skip: !testDatabaseUrl && 'Definí TEST_DATABASE_URL para ejecutar la prueba de integración.'
+}, async (t) => {
+  const applicationDatabaseUrl = process.env.DATABASE_URL;
+  assert.notEqual(
+    databaseIdentity(testDatabaseUrl),
+    applicationDatabaseUrl ? databaseIdentity(applicationDatabaseUrl) : null,
+    'TEST_DATABASE_URL no puede apuntar a la base configurada para la aplicación.'
+  );
+
+  process.env.DATABASE_URL = testDatabaseUrl;
+  const [{ default: pool }, activityService] = await Promise.all([
+    import('../../config/db.js'),
+    import('./services/activityService.js')
+  ]);
+
   // Generador de IDs únicos para datos de prueba aislados
-  const testRunId = Date.now().toString().slice(-6);
+  const testRunId = `${String(Date.now()).slice(-5)}${Math.floor(Math.random() * 10)}`;
   const testDnis = [
     `99${testRunId}1`,
     `99${testRunId}2`,
@@ -15,24 +37,37 @@ test('Integración Real con PostgreSQL/Supabase - Módulo 3 Clases Grupales', as
   ];
   const userIds = [];
   let testClassId = null;
+  const testClassIds = [];
 
-  // Setup: Crear usuarios socios de prueba con suscripciones activas
   try {
+    const [{ rows: roles }, { rows: sedes }, { rows: planes }] = await Promise.all([
+      pool.query("SELECT id FROM public.rol WHERE tipo = 'socio' LIMIT 1"),
+      pool.query('SELECT id FROM public.sede ORDER BY id LIMIT 1'),
+      pool.query('SELECT id FROM public.plan ORDER BY id LIMIT 1')
+    ]);
+    if (!roles[0] || !sedes[0] || !planes[0]) {
+      throw new Error('La base de pruebas debe tener al menos un rol socio, una sede y un plan.');
+    }
+
+    const idRolSocio = roles[0].id;
+    const idSede = sedes[0].id;
+    const idPlan = planes[0].id;
+
     for (let i = 0; i < testDnis.length; i++) {
       const dni = testDnis[i];
       const { rows: uRows } = await pool.query(
         `INSERT INTO public.usuario (dni, nombre, contacto, password, id_rol, activo)
-         VALUES ($1, $2, $3, 'password_test_123', 3, TRUE)
+         VALUES ($1, $2, $3, 'password_test_123', $4, TRUE)
          RETURNING id`,
-        [dni, `Socio Test ${i + 1}`, `test_${dni}@fitzone.test`]
+        [dni, `Socio Test ${i + 1}`, `test_${dni}@fitzone.test`, idRolSocio]
       );
       const uid = uRows[0].id;
       userIds.push(uid);
 
       await pool.query(
         `INSERT INTO public.suscripcion (id_usuario, id_plan, fecha_inicio, fecha_fin, estado, fecha_proximo_vencimiento)
-         VALUES ($1, 1, CURRENT_DATE - 5, CURRENT_DATE + 30, 'activa', CURRENT_DATE + 30)`,
-        [uid]
+         VALUES ($1, $2, CURRENT_DATE - 5, CURRENT_DATE + 30, 'activa', CURRENT_DATE + 30)`,
+        [uid, idPlan]
       );
     }
 
@@ -42,11 +77,12 @@ test('Integración Real con PostgreSQL/Supabase - Módulo 3 Clases Grupales', as
 
     const { rows: cRows } = await pool.query(
       `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
-       VALUES (1, $1, 'Profesor Test', 1, $2, $3)
+       VALUES ($1, $2, 'Profesor Test', 1, $3, $4)
        RETURNING id, cupo, fecha_inicio AS "fechaInicio"`,
-      [`Clase Test Integ ${testRunId}`, fechaInicio, fechaFin]
+      [idSede, `Clase Test Integ ${testRunId}`, fechaInicio, fechaFin]
     );
     testClassId = cRows[0].id;
+    testClassIds.push(testClassId);
 
     // -------------------------------------------------------------
     // Escenario 1: Reserva exitosa en PostgreSQL
@@ -87,11 +123,12 @@ test('Integración Real con PostgreSQL/Supabase - Módulo 3 Clases Grupales', as
       const fFin = new Date(fInicio.getTime() + 60 * 60 * 1000);
       const { rows: clRows } = await pool.query(
         `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
-         VALUES (1, $1, 'Profe Concurrente', 1, $2, $3)
+         VALUES ($1, $2, 'Profe Concurrente', 1, $3, $4)
          RETURNING id`,
-        [`Concurrencia Test ${testRunId}`, fInicio, fFin]
+        [idSede, `Concurrencia Test ${testRunId}`, fInicio, fFin]
       );
       const concClaseId = clRows[0].id;
+      testClassIds.push(concClaseId);
 
       try {
         const socioA = userIds[1];
@@ -229,16 +266,45 @@ test('Integración Real con PostgreSQL/Supabase - Módulo 3 Clases Grupales', as
     });
 
   } finally {
-    // Teardown: Eliminar datos de prueba en orden
-    if (testClassId) {
-      await pool.query('DELETE FROM public.notificaciones_clase_grupal WHERE id_clase_grupal = $1', [testClassId]);
-      await pool.query('DELETE FROM public.inscripciones_clase_grupal WHERE id_clase_grupal = $1', [testClassId]);
-      await pool.query('DELETE FROM public.clase_grupal WHERE id = $1', [testClassId]);
+    try {
+      await pool.query(
+        `DELETE FROM public.notificaciones_clase_grupal
+         WHERE id_clase_grupal = ANY($1::bigint[]) OR id_usuario = ANY($2::bigint[])`,
+        [testClassIds, userIds]
+      );
+      await pool.query(
+        `DELETE FROM public.inscripciones_clase_grupal
+         WHERE id_clase_grupal = ANY($1::bigint[]) OR id_usuario = ANY($2::bigint[])`,
+        [testClassIds, userIds]
+      );
+      if (testClassIds.length > 0) {
+        await pool.query('DELETE FROM public.clase_grupal WHERE id = ANY($1::bigint[])', [testClassIds]);
+      }
+      if (userIds.length > 0) {
+        await pool.query('DELETE FROM public.suscripcion WHERE id_usuario = ANY($1::bigint[])', [userIds]);
+        await pool.query('DELETE FROM public.usuario WHERE id = ANY($1::bigint[])', [userIds]);
+      }
+
+      const { rows } = await pool.query(
+        `
+          SELECT
+            (SELECT COUNT(*) FROM public.clase_grupal WHERE id = ANY($1::bigint[])) AS clases,
+            (SELECT COUNT(*) FROM public.inscripciones_clase_grupal
+             WHERE id_clase_grupal = ANY($1::bigint[]) OR id_usuario = ANY($2::bigint[])) AS inscripciones,
+            (SELECT COUNT(*) FROM public.notificaciones_clase_grupal
+             WHERE id_clase_grupal = ANY($1::bigint[]) OR id_usuario = ANY($2::bigint[])) AS notificaciones,
+            (SELECT COUNT(*) FROM public.suscripcion WHERE id_usuario = ANY($2::bigint[])) AS suscripciones,
+            (SELECT COUNT(*) FROM public.usuario WHERE id = ANY($2::bigint[])) AS usuarios
+        `,
+        [testClassIds, userIds]
+      );
+      assert.deepEqual(
+        Object.values(rows[0]).map(Number),
+        [0, 0, 0, 0, 0],
+        'La limpieza de los datos de integración debe quedar verificada.'
+      );
+    } finally {
+      await pool.end();
     }
-    for (const uid of userIds) {
-      await pool.query('DELETE FROM public.suscripcion WHERE id_usuario = $1', [uid]);
-      await pool.query('DELETE FROM public.usuario WHERE id = $1', [uid]);
-    }
-    // No cerrar pool aquí para no interferir con otros tests si corren en el mismo proceso
   }
 });

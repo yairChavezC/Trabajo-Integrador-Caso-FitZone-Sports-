@@ -16,6 +16,10 @@ import {
 
 import { CreateActivityDTO, UpdateActivityDTO } from '../dtos/activity.dto.js';
 import { BusinessError } from '../errors.js';
+import {
+  getClassNotifications as getClassNotificationsService,
+  markClassNotificationAsRead as markClassNotificationAsReadService
+} from '../services/notificationService.js';
 
 const handleError = (res, error, fallbackMessage) => {
   if (error instanceof BusinessError) {
@@ -24,8 +28,7 @@ const handleError = (res, error, fallbackMessage) => {
 
   console.error(fallbackMessage, error);
   return res.status(500).json({
-    message: 'Error interno del servidor',
-    error: error.message
+    message: 'Error interno del servidor'
   });
 };
 
@@ -38,6 +41,9 @@ export const getActivities = async (req, res) => {
   try {
     const tipo = await getCurrentUserRole(req.usuario?.rol);
     let idSede = null;
+    const incluirPasadas =
+      req.query.incluirPasadas === 'true' &&
+      ['administrador', 'gerente'].includes(tipo);
 
     if (tipo === 'recepcionista') {
       idSede = await getAssignedSiteForUser(getUserId(req));
@@ -51,7 +57,7 @@ export const getActivities = async (req, res) => {
       }
     }
 
-    const activities = await getAllActivities(getUserId(req), idSede);
+    const activities = await getAllActivities(getUserId(req), idSede, incluirPasadas);
     return res.status(200).json(activities);
   } catch (error) {
     return handleError(res, error, 'Error al obtener las clases:');
@@ -64,6 +70,29 @@ export const getMyRegistrations = async (req, res) => {
     return res.status(200).json(registrations);
   } catch (error) {
     return handleError(res, error, 'Error al obtener mis inscripciones:');
+  }
+};
+
+export const getClassNotifications = async (req, res) => {
+  try {
+    const notifications = await getClassNotificationsService(getUserId(req));
+    return res.status(200).json(notifications);
+  } catch (error) {
+    return handleError(res, error, 'Error al obtener las notificaciones de clases:');
+  }
+};
+
+export const markClassNotificationAsRead = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: 'El ID de la notificación es inválido.' });
+    }
+
+    const notification = await markClassNotificationAsReadService(id, getUserId(req));
+    return res.status(200).json(notification);
+  } catch (error) {
+    return handleError(res, error, 'Error al marcar la notificación como leída:');
   }
 };
 

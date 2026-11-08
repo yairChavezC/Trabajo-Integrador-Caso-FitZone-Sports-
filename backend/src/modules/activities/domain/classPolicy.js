@@ -60,3 +60,41 @@ export const validarReduccionDeCupo = (cupo, confirmados) => {
     );
   }
 };
+
+export const validarInicioFuturo = (fechaInicio, ahora = Date.now()) => {
+  const inicio = new Date(fechaInicio).getTime();
+  if (Number.isNaN(inicio)) {
+    throw new BusinessError('La fecha de inicio no es válida.', 400);
+  }
+  if (inicio <= ahora) {
+    throw new BusinessError('La fecha de inicio debe estar en el futuro.', 400);
+  }
+};
+
+export const calcularAccionesClase = (clase, ahora = Date.now()) => {
+  const horasRestantes = horasHastaInicio(clase.fechaInicio, ahora);
+  const miInscripcion = clase.miInscripcion;
+
+  return {
+    ...clase,
+    puedeReservar:
+      !miInscripcion &&
+      horasRestantes > 0 &&
+      horasRestantes <= HORAS_ANTICIPACION_RESERVA &&
+      Number(clase.cupoDisponible) > 0,
+    puedeAnotarseListaEspera:
+      !miInscripcion &&
+      horasRestantes > 0 &&
+      Number(clase.cupoDisponible) <= 0,
+    puedeAceptarOferta: Boolean(
+      miInscripcion?.estado === 'notificado' &&
+      horasRestantes > 0 &&
+      new Date(miInscripcion.fechaExpiracionOferta).getTime() > ahora
+    ),
+    puedeCancelar: Boolean(
+      miInscripcion &&
+      horasRestantes > 0 &&
+      (miInscripcion.estado !== 'confirmado' || horasRestantes >= HORAS_LIMITE_CANCELACION)
+    )
+  };
+};

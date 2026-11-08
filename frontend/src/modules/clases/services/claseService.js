@@ -1,7 +1,8 @@
 import { httpClient } from '../../../core/api/httpClient';
 
-export const getClases = async () => {
-  return httpClient.get('/clases');
+export const getClases = async (incluirPasadas = false) => {
+  const query = incluirPasadas ? '?incluirPasadas=true' : '';
+  return httpClient.get(`/clases${query}`);
 };
 
 export const getRolClases = async () => {
@@ -42,6 +43,14 @@ export const aceptarOfertaListaEspera = async (id) => {
 
 export const getMisInscripciones = async () => {
   return httpClient.get('/clases/mis-inscripciones');
+};
+
+export const getNotificacionesClases = async () => {
+  return httpClient.get('/clases/notificaciones');
+};
+
+export const marcarNotificacionClaseLeida = async (id) => {
+  return httpClient.put(`/clases/notificaciones/${id}/leida`);
 };
 
 export const getInscripcionesClase = async (id) => {

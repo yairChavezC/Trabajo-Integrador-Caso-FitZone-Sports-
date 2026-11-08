@@ -1,5 +1,6 @@
 import * as defaultActivityRepo from '../repositories/activityRepository.js';
 import * as defaultInscriptionRepo from '../repositories/inscriptionRepository.js';
+import * as defaultNotificationRepo from '../repositories/notificationRepository.js';
 import { classWaitlistSubject as defaultWaitlistSubject } from '../observers/waitlistObserver.js';
 import { BusinessError } from '../errors.js';
 import {
@@ -8,7 +9,9 @@ import {
   validarVentanaCancelacion,
   validarCapacidadParaReserva,
   validarCapacidadParaListaEspera,
-  validarReduccionDeCupo
+  validarReduccionDeCupo,
+  validarInicioFuturo,
+  calcularAccionesClase
 } from '../domain/classPolicy.js';
 
 const waitlistOfferMinutes = Number(process.env.WAITLIST_OFFER_MINUTES || 15);
@@ -32,6 +35,7 @@ if (!Number.isInteger(waitlistOfferCheckIntervalMs) || waitlistOfferCheckInterva
 export const createActivityService = (dependencies = {}) => {
   const activityRepo = dependencies.activityRepo || defaultActivityRepo;
   const inscriptionRepo = dependencies.inscriptionRepo || defaultInscriptionRepo;
+  const notificationRepo = dependencies.notificationRepo || defaultNotificationRepo;
   const waitlistSubject = dependencies.waitlistSubject || defaultWaitlistSubject;
   const now = dependencies.now || (() => Date.now());
 
@@ -82,6 +86,7 @@ export const createActivityService = (dependencies = {}) => {
         idInscripcion: oferta.id,
         motivo: 'oferta_temporal_lista_espera'
       };
+      await notificationRepo.createWaitlistPromotion(evento, client);
       eventos.push(evento);
       ocupados += 1;
     }
@@ -95,9 +100,10 @@ export const createActivityService = (dependencies = {}) => {
     }
   };
 
-  const getAllActivities = async (idUsuario = null, idSede = null) => {
+  const getAllActivities = async (idUsuario = null, idSede = null, incluirPasadas = false) => {
     try {
-      return await activityRepo.findAllActivities(idUsuario, idSede);
+      const activities = await activityRepo.findAllActivities(idUsuario, idSede, incluirPasadas);
+      return activities.map((clase) => calcularAccionesClase(clase, now()));
     } catch (error) {
       console.error('Error en activityService.getAllActivities:', error);
       throw error;
@@ -147,7 +153,8 @@ export const createActivityService = (dependencies = {}) => {
         throw new Error('El ID de la clase es obligatorio.');
       }
 
-      return await activityRepo.findActivityById(id, idUsuario);
+      const clase = await activityRepo.findActivityById(id, idUsuario);
+      return clase ? calcularAccionesClase(clase, now()) : clase;
     } catch (error) {
       console.error('Error en activityService.getActivityById:', error);
       throw error;
@@ -160,6 +167,7 @@ export const createActivityService = (dependencies = {}) => {
         throw new Error('El DTO es obligatorio.');
       }
 
+      validarInicioFuturo(dto.fechaInicio, now());
       return await activityRepo.createActivity(dto);
     } catch (error) {
       console.error('Error en activityService.createActivity:', error);
@@ -177,7 +185,7 @@ export const createActivityService = (dependencies = {}) => {
         throw new Error('El DTO es obligatorio.');
       }
 
-      return await inscriptionRepo.withTransaction(async (client) => {
+      const resultado = await inscriptionRepo.withTransaction(async (client) => {
         const clase = await activityRepo.lockActivityById(id, client);
         if (!clase) return null;
 
@@ -194,11 +202,33 @@ export const createActivityService = (dependencies = {}) => {
           fechaInicio: dto.fechaInicio ?? clase.fechaInicio,
           fechaFin: dto.fechaFin ?? clase.fechaFin
         };
+        const cambioInicio =
+          new Date(updateDto.fechaInicio).getTime() !== new Date(clase.fechaInicio).getTime();
+        const cambioFechas = cambioInicio ||
+          new Date(updateDto.fechaFin).getTime() !== new Date(clase.fechaFin).getTime();
+        if (cambioFechas) {
+          if (cambioInicio) validarInicioFuturo(updateDto.fechaInicio, now());
+          const inscripcionesActivas = await inscriptionRepo.countActiveInscriptions(id, client);
+          if (inscripcionesActivas > 0) {
+            throw new BusinessError(
+              'No se pueden cambiar las fechas de una clase con inscripciones activas.',
+              409
+            );
+          }
+        }
+
         const confirmados = await inscriptionRepo.countConfirmed(id, client);
         validarReduccionDeCupo(updateDto.cupo, confirmados);
 
-        return activityRepo.updateActivity(id, updateDto, client);
+        const claseActualizada = await activityRepo.updateActivity(id, updateDto, client);
+        const eventos = updateDto.cupo > clase.cupo
+          ? await offerAvailablePlaces(claseActualizada, client)
+          : [];
+        return { clase: claseActualizada, eventos };
       });
+      if (!resultado) return resultado;
+      await notifyWaitlistEvents(resultado.eventos);
+      return resultado.clase;
     } catch (error) {
       console.error('Error en activityService.updateActivity:', error);
       throw error;
@@ -211,15 +241,19 @@ export const createActivityService = (dependencies = {}) => {
         throw new Error('El ID de la clase es obligatorio.');
       }
 
-      const confirmados = await inscriptionRepo.countConfirmed(id);
-      if (confirmados > 0) {
-        throw new BusinessError(
-          `No se puede eliminar la clase porque cuenta con ${confirmados} reserva(s) activa(s). Cancelá las inscripciones primero.`,
-          409
-        );
-      }
+      return await inscriptionRepo.withTransaction(async (client) => {
+        const clase = await activityRepo.lockActivityById(id, client);
+        if (!clase) return null;
+        const confirmados = await inscriptionRepo.countConfirmed(id, client);
+        if (confirmados > 0) {
+          throw new BusinessError(
+            `No se puede eliminar la clase porque cuenta con ${confirmados} reserva(s) activa(s). Cancelá las inscripciones primero.`,
+            409
+          );
+        }
 
-      return await activityRepo.deleteActivity(id);
+        return activityRepo.deleteActivity(id, client);
+      });
     } catch (error) {
       if (error.code === '23503') {
         throw new BusinessError(

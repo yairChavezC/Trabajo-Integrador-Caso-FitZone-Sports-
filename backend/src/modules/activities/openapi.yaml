@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: FitZone - Clases Grupales
+  version: 1.0.0
+  description: Contrato HTTP del módulo de clases grupales.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+tags:
+  - name: Clases grupales
+paths:
+  /clases:
+    get:
+      tags: [Clases grupales]
+      summary: Listar clases disponibles para la agenda del usuario
+      parameters:
+        - in: query
+          name: idSede
+          schema:
+            type: integer
+          description: Sede opcional para administradores y gerentes; recepcionistas ven su sede asignada.
+        - in: query
+          name: incluirPasadas
+          schema:
+            type: boolean
+            default: false
+          description: Administradores y gerentes pueden incluir clases finalizadas.
+      responses:
+        '200':
+          description: Lista de clases.
+    post:
+      tags: [Clases grupales]
+      summary: Crear una clase
+      description: Requiere rol administrador o gerente, o recepcionista asignado a la sede indicada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaseInput'
+      responses:
+        '201':
+          description: Clase creada.
+        '400':
+          description: Datos inválidos.
+        '403':
+          description: El usuario no puede gestionar la sede indicada.
+  /clases/mi-rol:
+    get:
+      tags: [Clases grupales]
+      summary: Obtener el rol y sede asignada para el módulo
+      responses:
+        '200':
+          description: Perfil de acceso.
+  /clases/mis-inscripciones:
+    get:
+      tags: [Clases grupales]
+      summary: Listar las próximas inscripciones del socio autenticado
+      responses:
+        '200':
+          description: Inscripciones próximas.
+  /clases/notificaciones:
+    get:
+      tags: [Clases grupales]
+      summary: Listar notificaciones del socio autenticado
+      description: Solo devuelve notificaciones pertenecientes al usuario autenticado.
+      responses:
+        '200':
+          description: Notificaciones recientes.
+  /clases/notificaciones/{id}/leida:
+    put:
+      tags: [Clases grupales]
+      summary: Marcar una notificación propia como leída
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      responses:
+        '200':
+          description: Notificación actualizada.
+        '404':
+          description: Notificación no encontrada para el usuario autenticado.
+  /clases/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ClassId'
+    get:
+      tags: [Clases grupales]
+      summary: Obtener una clase por ID
+      responses:
+        '200':
+          description: Clase encontrada.
+        '404':
+          description: Clase no encontrada.
+    put:
+      tags: [Clases grupales]
+      summary: Actualizar una clase
+      description: Recepcionistas solo pueden mantener la clase en su sede asignada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaseUpdate'
+      responses:
+        '200':
+          description: Clase actualizada.
+        '400':
+          description: Datos inválidos.
+        '403':
+          description: El usuario no puede gestionar la sede actual o destino.
+        '404':
+          description: Clase no encontrada.
+    delete:
+      tags: [Clases grupales]
+      summary: Eliminar una clase
+      responses:
+        '200':
+          description: Clase eliminada.
+        '409':
+          description: La clase tiene inscripciones que impiden eliminarla.
+  /clases/{id}/inscripciones:
+    get:
+      tags: [Clases grupales]
+      summary: Listar inscripciones de una clase
+      description: Requiere rol administrador o gerente, o recepcionista de la sede de la clase.
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: Inscripciones de la clase.
+        '403':
+          description: El usuario no puede gestionar esta sede.
+  /clases/{id}/reservas:
+    parameters:
+      - $ref: '#/components/parameters/ClassId'
+    post:
+      tags: [Clases grupales]
+      summary: Reservar un lugar en una clase
+      description: Requiere rol socio y membresía activa.
+      responses:
+        '201':
+          description: Reserva confirmada.
+        '403':
+          description: La membresía no permite reservar.
+        '409':
+          description: No hay capacidad o ya existe una inscripción activa.
+    delete:
+      tags: [Clases grupales]
+      summary: Cancelar una reserva o inscripción
+      description: Requiere rol socio.
+      responses:
+        '200':
+          description: Inscripción cancelada.
+        '409':
+          description: La cancelación no está permitida en este momento.
+  /clases/{id}/lista-espera:
+    post:
+      tags: [Clases grupales]
+      summary: Anotarse en la lista de espera
+      description: Requiere rol socio y membresía activa.
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '201':
+          description: Inscripción en lista de espera creada.
+        '409':
+          description: La clase no admite nuevas inscripciones.
+  /clases/{id}/lista-espera/aceptar:
+    post:
+      tags: [Clases grupales]
+      summary: Aceptar una oferta temporal de la lista de espera
+      description: Requiere rol socio.
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: Oferta aceptada y lugar confirmado.
+        '409':
+          description: La oferta no existe o venció.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ClassId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    NotificationId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  schemas:
+    ClaseInput:
+      type: object
+      required: [idSede, nombre, profesor, cupo, fechaInicio, fechaFin]
+      properties:
+        idSede:
+          type: integer
+          minimum: 1
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 100
+        profesor:
+          type: string
+          minLength: 3
+          maxLength: 150
+        cupo:
+          type: integer
+          minimum: 1
+        fechaInicio:
+          type: string
+          format: date-time
+        fechaFin:
+          type: string
+          format: date-time
+    ClaseUpdate:
+      type: object
+      description: Enviar al menos un campo.
+      properties:
+        idSede:
+          type: integer
+          minimum: 1
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 100
+        profesor:
+          type: string
+          minLength: 3
+          maxLength: 150
+        cupo:
+          type: integer
+          minimum: 1
+        fechaInicio:
+          type: string
+          format: date-time
+        fechaFin:
+          type: string
+          format: date-time

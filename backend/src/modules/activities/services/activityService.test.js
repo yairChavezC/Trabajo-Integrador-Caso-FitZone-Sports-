@@ -30,13 +30,15 @@ const createMockDependencies = (overrides = {}) => {
     ...(overrides.activityRepo || {})
   };
 
+  const transactionClient = {};
   const inscriptionRepo = {
-    withTransaction: async (work) => work({}),
+    withTransaction: async (work) => work(transactionClient),
     hasActiveMembership: async (idUsuario) => idUsuario === 10,
     findActiveByUserAndClass: async () => null,
     countConfirmed: async () => 2,
     insertInscription: async (data) => ({ id: 101, ...data, fechaRegistro: new Date().toISOString() }),
     cancelInscription: async (id) => ({ id, estado: 'cancelado' }),
+    countActiveInscriptions: async () => 0,
     findNextWaitlist: async () => null,
     promoteWaitlistInscription: async (id, mins) => ({
       id,
@@ -52,6 +54,13 @@ const createMockDependencies = (overrides = {}) => {
   };
 
   const notifiedEvents = [];
+  const persistedNotifications = [];
+  const notificationRepo = {
+    createWaitlistPromotion: async (evento, client) => {
+      persistedNotifications.push({ evento, client });
+    },
+    ...(overrides.notificationRepo || {})
+  };
   const waitlistSubject = {
     notify: async (evento) => {
       notifiedEvents.push(evento);
@@ -63,11 +72,20 @@ const createMockDependencies = (overrides = {}) => {
   const now = overrides.now || makeFixedNow('2026-11-06T00:00:00.000Z');
 
   return {
-    service: createActivityService({ activityRepo, inscriptionRepo, waitlistSubject, now }),
+    service: createActivityService({
+      activityRepo,
+      inscriptionRepo,
+      notificationRepo,
+      waitlistSubject,
+      now
+    }),
     activityRepo,
     inscriptionRepo,
+    notificationRepo,
     waitlistSubject,
-    notifiedEvents
+    notifiedEvents,
+    persistedNotifications,
+    transactionClient
   };
 };
 
@@ -177,7 +195,7 @@ test('Lista de espera: rechaza inscripción si todavía existen cupos confirmado
 
 test('Cancelación: reserva confirmada con más de 2 horas se cancela y promueve al siguiente de lista de espera', async () => {
   let promotedId = null;
-  const { service, notifiedEvents } = createMockDependencies({
+  const { service, notifiedEvents, persistedNotifications, transactionClient } = createMockDependencies({
     now: makeFixedNow('2026-11-06T06:00:00.000Z'), // 4 horas antes del inicio (10:00)
     inscriptionRepo: {
       findActiveByUserAndClass: async () => ({ id: 45, estado: 'confirmado' }),
@@ -197,6 +215,31 @@ test('Cancelación: reserva confirmada con más de 2 horas se cancela y promueve
   assert.equal(notifiedEvents.length, 1);
   assert.equal(notifiedEvents[0].idUsuario, 33);
   assert.equal(notifiedEvents[0].motivo, 'oferta_temporal_lista_espera');
+  assert.equal(persistedNotifications.length, 1);
+  assert.deepEqual(persistedNotifications[0].evento, notifiedEvents[0]);
+  assert.equal(persistedNotifications[0].client, transactionClient);
+});
+
+test('si falla la persistencia de la notificación, la transacción de promoción falla', async () => {
+  const { service } = createMockDependencies({
+    inscriptionRepo: {
+      findActiveByUserAndClass: async () => ({ id: 45, estado: 'confirmado' }),
+      cancelInscription: async (id) => ({ id, estado: 'cancelado' }),
+      countConfirmed: async () => 4,
+      findNextWaitlist: async () => ({ id: 77, idUsuario: 33 }),
+      promoteWaitlistInscription: async (id) => ({ id, idUsuario: 33, estado: 'notificado' })
+    },
+    notificationRepo: {
+      createWaitlistPromotion: async () => {
+        throw new Error('No se pudo guardar la notificación.');
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => service.cancelClassReservation(1, 10),
+    /No se pudo guardar la notificación/
+  );
 });
 
 test('Cancelación: reserva confirmada con menos de 2 horas es rechazada por política', async () => {
@@ -377,5 +420,140 @@ test('Eliminación de clase: rechaza si la actividad tiene reservas activas', as
       err instanceof BusinessError &&
       err.status === 409 &&
       err.message.includes('cuenta con 3 reserva(s) activa(s)')
+  );
+});
+
+test('Actualizar cupo promueve la lista de espera y notifica tras la transacción', async () => {
+  const operaciones = [];
+  let esperaConsultada = false;
+  const { service, notifiedEvents } = createMockDependencies({
+    activityRepo: {
+      updateActivity: async (id, dto) => ({ id, ...dto })
+    },
+    inscriptionRepo: {
+      countConfirmed: async () => 2,
+      findNextWaitlist: async () => {
+        if (esperaConsultada) return null;
+        esperaConsultada = true;
+        return { id: 45 };
+      },
+      promoteWaitlistInscription: async () => ({
+        id: 45,
+        idUsuario: 22,
+        estado: 'notificado'
+      }),
+      withTransaction: async (work) => {
+        operaciones.push('begin');
+        const result = await work({});
+        operaciones.push('commit');
+        return result;
+      }
+    },
+    waitlistSubject: {
+      notify: async (evento) => {
+        operaciones.push('notify');
+        notifiedEvents.push(evento);
+      }
+    }
+  });
+
+  const clase = await service.updateActivity(1, {
+    cupo: 6,
+    validate: () => []
+  });
+
+  assert.equal(clase.cupo, 6);
+  assert.equal(notifiedEvents.length, 1);
+  assert.deepEqual(operaciones, ['begin', 'commit', 'notify']);
+});
+
+test('Eliminar clase bloquea y borra dentro de la misma transacción', async () => {
+  const client = {};
+  const llamadas = [];
+  const { service } = createMockDependencies({
+    activityRepo: {
+      lockActivityById: async (_id, transactionClient) => {
+        llamadas.push(['lock', transactionClient]);
+        return { id: 1 };
+      },
+      deleteActivity: async (_id, transactionClient) => {
+        llamadas.push(['delete', transactionClient]);
+        return { id: 1 };
+      }
+    },
+    inscriptionRepo: {
+      countConfirmed: async (_id, transactionClient) => {
+        llamadas.push(['count', transactionClient]);
+        return 0;
+      },
+      withTransaction: async (work) => work(client)
+    }
+  });
+
+  await service.deleteActivity(1);
+
+  assert.deepEqual(llamadas, [
+    ['lock', client],
+    ['count', client],
+    ['delete', client]
+  ]);
+});
+
+test('no permite mover fechas si hay inscripciones activas', async () => {
+  const { service } = createMockDependencies({
+    inscriptionRepo: {
+      countActiveInscriptions: async () => 1
+    }
+  });
+
+  await assert.rejects(
+    service.updateActivity(1, {
+      fechaInicio: '2026-11-07T10:00:00.000Z',
+      validate: () => []
+    }),
+    (error) => error instanceof BusinessError && error.status === 409
+  );
+});
+
+test('no permite cambiar el inicio a una fecha pasada', async () => {
+  const { service } = createMockDependencies({
+    inscriptionRepo: {
+      countActiveInscriptions: async () => 0
+    }
+  });
+
+  await assert.rejects(
+    service.updateActivity(1, {
+      fechaInicio: '2026-11-05T10:00:00.000Z',
+      validate: () => []
+    }),
+    (error) => error instanceof BusinessError && error.status === 400
+  );
+});
+
+test('permite corregir datos no temporales de una clase pasada', async () => {
+  const { service } = createMockDependencies({
+    now: makeFixedNow('2026-11-07T00:00:00.000Z'),
+    inscriptionRepo: {
+      countActiveInscriptions: async () => 0
+    }
+  });
+
+  const result = await service.updateActivity(1, {
+    profesor: 'Nueva profesora',
+    validate: () => []
+  });
+
+  assert.equal(result.profesor, 'Nueva profesora');
+});
+
+test('no permite crear una clase con inicio pasado', async () => {
+  const { service } = createMockDependencies();
+
+  await assert.rejects(
+    service.createActivity({
+      fechaInicio: '2026-11-05T10:00:00.000Z'
+    }),
+    (error) => error instanceof BusinessError && error.status === 400
   );
 });

@@ -52,6 +52,19 @@ export const countConfirmed = async (idClase, client = pool) => {
   return rows[0].total;
 };
 
+export const countActiveInscriptions = async (idClase, client = pool) => {
+  const { rows } = await client.query(
+    `
+      SELECT COUNT(*)::int AS total
+      FROM public.inscripciones_clase_grupal
+      WHERE id_clase_grupal = $1
+        AND estado IN ('confirmado', 'en espera', 'notificado')
+    `,
+    [idClase]
+  );
+  return rows[0].total;
+};
+
 export const findActiveByUserAndClass = async (idClase, idUsuario, client = pool) => {
   const { rows } = await client.query(
     `
@@ -244,8 +257,6 @@ export const listByClass = async (idClase, client = pool) => {
         i.id_clase_grupal AS "idClase",
         i.id_usuario AS "idUsuario",
         u.nombre AS "nombreUsuario",
-        u.dni AS "dniUsuario",
-        u.contacto AS "contactoUsuario",
         i.estado,
         i.fecha_registro AS "fechaRegistro",
         i.fecha_expiracion_oferta AS "fechaExpiracionOferta"
