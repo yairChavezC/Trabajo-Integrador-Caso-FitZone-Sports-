@@ -54,4 +54,9 @@ async function createUser(data) {
   }
 }
 
-export default { getAllUsers, getUserById, createUser };
+async function getPagosByUsuario(id) {
+  await getUserById(id); // valida que el usuario exista antes de buscar sus pagos
+  return repository.findPagosByUsuario(id);
+}
+
+export default { getAllUsers, getUserById, createUser, getPagosByUsuario };

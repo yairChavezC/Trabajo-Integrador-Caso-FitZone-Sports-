@@ -42,4 +42,16 @@ async function create({ nombre, dni, contacto, password, idRol }) {
   return result.rows[0];
 }
 
-export default { findAll, findById, create };
+
+async function findPagosByUsuario(idUsuario) {
+  const result = await pool.query(
+    `SELECT id, monto, medio_pago, estado, fecha_pago, motivo_rechazo
+     FROM pagos
+     WHERE id_usuario = $1
+     ORDER BY fecha_pago DESC NULLS LAST, creado_at DESC`,
+    [idUsuario]
+  );
+  return result.rows;
+}
+
+export default { findAll, findById, create, findPagosByUsuario };

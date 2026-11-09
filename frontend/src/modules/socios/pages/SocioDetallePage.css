@@ -299,3 +299,40 @@
   .detalle-profile-actions { width: 100%; justify-content: space-between; }
   .detalle-data { grid-template-columns: 1fr; }
 }
+
+/* Historial de pagos */
+
+.detalle-pagos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detalle-pago-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--fz-border);
+}
+
+.detalle-pago-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.detalle-pago-item strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detalle-pago-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--fz-muted);
+  font-size: 11px;
+}

@@ -1,9 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, ChevronRight, Info, User } from 'lucide-react';
-import { getMemberById } from '../services/membersService';
+import { ArrowLeft, BadgeCheck, ChevronRight, Info, Receipt, User } from 'lucide-react';
+import { getMemberById, getMemberPagos } from '../services/membersService';
 import RenovarMembresiaModal from '../components/RenovarMembresiaModal';
 import './SocioDetallePage.css';
+
+const FORMATO_PRECIO = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+const ESTADO_PAGO = {
+  APROBADO: { texto: 'Aprobado', clase: 'is-active' },
+  RECHAZADO: { texto: 'Rechazado', clase: 'is-expired' },
+  PENDIENTE: { texto: 'Pendiente', clase: 'is-suspended' },
+};
 
 function formatFecha(valor, timeZone) {
   if (!valor) return '—';
@@ -55,6 +68,10 @@ export default function SocioDetallePage() {
   const [error, setError] = useState(null);
   const [showRenovar, setShowRenovar] = useState(false);
 
+  const [pagos, setPagos] = useState([]);
+  const [loadingPagos, setLoadingPagos] = useState(true);
+  const [errorPagos, setErrorPagos] = useState(null);
+
   const cargarSocio = useCallback(() => {
     return getMemberById(id)
       .then((data) => {
@@ -65,10 +82,22 @@ export default function SocioDetallePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const cargarPagos = useCallback(() => {
+    setLoadingPagos(true);
+    return getMemberPagos(id)
+      .then((data) => {
+        setPagos(data);
+        setErrorPagos(null);
+      })
+      .catch((err) => setErrorPagos(err.message))
+      .finally(() => setLoadingPagos(false));
+  }, [id]);
+
   useEffect(() => {
     setLoading(true);
     cargarSocio();
-  }, [cargarSocio]);
+    cargarPagos();
+  }, [cargarSocio, cargarPagos]);
 
   if (loading) {
     return (
@@ -95,6 +124,11 @@ export default function SocioDetallePage() {
   const numeroSocio = `FZ-${String(socio.id).padStart(5, '0')}`;
   const tieneMembresia = Boolean(socio.fechaProximoVencimiento);
   const dias = tieneMembresia ? diasRestantes(socio.fechaProximoVencimiento) : null;
+
+  async function handleRenovado() {
+    await cargarSocio();
+    await cargarPagos();
+  }
 
   return (
     <main className="detalle-page">
@@ -168,10 +202,40 @@ export default function SocioDetallePage() {
           </section>
 
           <section className="detalle-card">
-            <h3 className="detalle-card-title">Actividad reciente</h3>
-            <p className="detalle-empty">
-              Todavía no hay actividad registrada para este socio.
-            </p>
+            <h3 className="detalle-card-title">
+              <Receipt size={16} /> Historial de pagos
+            </h3>
+
+            {loadingPagos && <p className="detalle-empty">Cargando pagos...</p>}
+            {errorPagos && <p className="detalle-empty">{errorPagos}</p>}
+
+            {!loadingPagos && !errorPagos && pagos.length === 0 && (
+              <p className="detalle-empty">Este socio todavía no registra pagos.</p>
+            )}
+
+            {!loadingPagos && !errorPagos && pagos.length > 0 && (
+              <ul className="detalle-pagos">
+                {pagos.map((pago) => {
+                  const estadoPago = ESTADO_PAGO[pago.estado] || {
+                    texto: pago.estado,
+                    clase: 'is-suspended',
+                  };
+                  return (
+                    <li key={pago.id} className="detalle-pago-item">
+                      <div>
+                        <strong>{FORMATO_PRECIO.format(pago.monto)}</strong>
+                        <span className="detalle-pago-meta">
+                          {formatFecha(pago.fechaPago)} · {pago.medioPago}
+                        </span>
+                      </div>
+                      <span className={`detalle-status ${estadoPago.clase}`}>
+                        {estadoPago.texto}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         </div>
 
@@ -219,7 +283,7 @@ export default function SocioDetallePage() {
         <RenovarMembresiaModal
           socio={socio}
           onClose={() => setShowRenovar(false)}
-          onRenovado={cargarSocio}
+          onRenovado={handleRenovado}
         />
       )}
     </main>

@@ -47,4 +47,22 @@ async function createUser(req, res, next) {
   }
 }
 
-export default { getUsers, getUser, createUser };
+async function getPagos(req, res, next) {
+  try {
+    const pagos = await service.getPagosByUsuario(req.params.id);
+    res.json(
+      pagos.map((p) => ({
+        id: p.id,
+        monto: Number(p.monto),
+        medioPago: p.medio_pago,
+        estado: p.estado,
+        fechaPago: p.fecha_pago,
+        motivoRechazo: p.motivo_rechazo,
+      }))
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+export default { getUsers, getUser, createUser, getPagos };

@@ -13,3 +13,7 @@ export async function getMemberById(id) {
 export async function createMember(memberData) {
   return httpClient.post('/users', memberData);
 }
+
+export async function getMemberPagos(id) {
+  return httpClient.get(`/users/${id}/pagos`);
+}
