@@ -57,18 +57,19 @@ const activityJoins = `
   ) mi ON TRUE
 `;
 
-export const findAllActivities = async (idUsuario = null, idSede = null) => {
+export const findAllActivities = async (idUsuario = null, idSede = null, incluirPasadas = false) => {
   const query = `
     SELECT
       ${classSelect}
     FROM public.clase_grupal c
     ${activityJoins}
     WHERE ($2::bigint IS NULL OR c.id_sede = $2)
+      AND ($3::boolean OR c.fecha_fin >= NOW())
     ORDER BY c.fecha_inicio ASC;
   `;
 
   try {
-    const { rows } = await pool.query(query, [idUsuario, idSede]);
+    const { rows } = await pool.query(query, [idUsuario, idSede, incluirPasadas]);
     return rows;
   } catch (error) {
     console.error('Error en activityRepository.findAllActivities:', error);
@@ -249,7 +250,7 @@ export const updateActivity = async (id, dto, client = pool) => {
   }
 };
 
-export const deleteActivity = async (id) => {
+export const deleteActivity = async (id, client = pool) => {
   const query = `
     DELETE FROM public.clase_grupal
     WHERE id = $1
@@ -258,7 +259,7 @@ export const deleteActivity = async (id) => {
   `;
 
   try {
-    const { rows } = await pool.query(query, [id]);
+    const { rows } = await client.query(query, [id]);
     return rows[0];
   } catch (error) {
     console.error('Error en activityRepository.deleteActivity:', error);

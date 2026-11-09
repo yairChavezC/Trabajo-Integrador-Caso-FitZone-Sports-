@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useClases } from '../hooks/useClases';
 import ClaseTable from '../components/ClaseTable';
+import {
+  getNotificacionesClases,
+  marcarNotificacionClaseLeida
+} from '../services/claseService';
 import './ClasesScreen.css';
 
 export default function AgendaClasesScreen({ puedeInscribirse = false }) {
@@ -12,16 +16,63 @@ export default function AgendaClasesScreen({ puedeInscribirse = false }) {
     reservar,
     cancelar,
     listaEspera,
-    aceptarOferta
+    aceptarOferta,
+    isActionPending
   } = useClases();
   const [tab, setTab] = useState('todas');
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [errorNotificaciones, setErrorNotificaciones] = useState(null);
+  const [marcandoLeida, setMarcandoLeida] = useState(null);
+
+  useEffect(() => {
+    if (!puedeInscribirse) return undefined;
+    let activo = true;
+
+    const cargarNotificaciones = () => {
+      getNotificacionesClases()
+        .then((data) => {
+          if (activo) {
+            setNotificaciones(Array.isArray(data) ? data : []);
+            setErrorNotificaciones(null);
+          }
+        })
+        .catch((err) => {
+          if (activo) setErrorNotificaciones(err.message);
+        });
+    };
+
+    cargarNotificaciones();
+    const intervalId = window.setInterval(cargarNotificaciones, 30000);
+
+    return () => {
+      activo = false;
+      window.clearInterval(intervalId);
+    };
+  }, [puedeInscribirse]);
+
+  const marcarLeida = async (id) => {
+    try {
+      setMarcandoLeida(id);
+      setErrorNotificaciones(null);
+      const actualizada = await marcarNotificacionClaseLeida(id);
+      setNotificaciones((actuales) =>
+        actuales.map((notificacion) => notificacion.id === actualizada.id ? actualizada : notificacion)
+      );
+    } catch (err) {
+      setErrorNotificaciones(err.message);
+    } finally {
+      setMarcandoLeida(null);
+    }
+  };
 
   const misInscripcionesCount = clases.filter((c) => Boolean(c.miInscripcion)).length;
   const clasesFiltradas = tab === 'mis-clases'
     ? clases.filter((c) => Boolean(c.miInscripcion))
     : clases;
 
-  if (loading) return <p className="clases-empty">Cargando agenda de clases...</p>;
+  if (loading && clases.length === 0) {
+    return <p className="clases-empty">Cargando agenda de clases...</p>;
+  }
   if (error) return <p className="clases-alert">Error: {error}</p>;
 
   return (
@@ -33,8 +84,48 @@ export default function AgendaClasesScreen({ puedeInscribirse = false }) {
 
       {actionError && <div className="clases-alert" role="alert">{actionError}</div>}
 
+      {puedeInscribirse && (
+        <section aria-labelledby="notificaciones-clases-title" className="clases-notificaciones">
+          <div className="clases-section-heading">
+            <div>
+              <h3 id="notificaciones-clases-title">Notificaciones</h3>
+              <p>Avisos sobre lugares liberados en clases grupales.</p>
+            </div>
+          </div>
+          {errorNotificaciones && <div className="clases-alert" role="alert">{errorNotificaciones}</div>}
+          {notificaciones.length === 0 ? (
+            <p className="clases-empty">No tenés notificaciones de clases.</p>
+          ) : (
+            <ul className="clases-notificaciones-lista">
+              {notificaciones.map((notificacion) => (
+                <li
+                  key={notificacion.id}
+                  className={notificacion.leidaAt ? 'clases-notificacion leida' : 'clases-notificacion'}
+                >
+                  <p>{notificacion.mensaje}</p>
+                  <time dateTime={notificacion.creadaAt}>
+                    {new Date(notificacion.creadaAt).toLocaleString('es-AR')}
+                  </time>
+                  {notificacion.leidaAt ? (
+                    <span>Leída</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => marcarLeida(notificacion.id)}
+                      disabled={marcandoLeida === notificacion.id}
+                    >
+                      {marcandoLeida === notificacion.id ? 'Guardando...' : 'Marcar como leída'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <section aria-labelledby="agenda-clases-title">
-        <div className="clases-tabs" role="tablist" style={{ marginBottom: '1rem' }}>
+        <div className="clases-tabs agenda-tabs" role="tablist">
           <button
             type="button"
             role="tab"
@@ -74,6 +165,7 @@ export default function AgendaClasesScreen({ puedeInscribirse = false }) {
           onCancelar={cancelar}
           onListaEspera={listaEspera}
           onAceptarOferta={aceptarOferta}
+          isActionPending={isActionPending}
         />
       </section>
     </main>

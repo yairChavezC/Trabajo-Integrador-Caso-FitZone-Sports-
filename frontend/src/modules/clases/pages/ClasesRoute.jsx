@@ -29,7 +29,7 @@ export default function ClasesRoute() {
     return <p className="clases-alert" role="alert">No se pudo cargar el rol: {error}</p>;
   }
   if (!perfil) return <p className="clases-empty">Cargando permisos de clases...</p>;
-  if (perfil.tipo === 'administrador' || perfil.tipo === 'gerente') return <ClasesScreen />;
+  if (perfil.tipo === 'gerente') return <ClasesScreen />;
   if (perfil.tipo === 'socio') return <AgendaClasesScreen puedeInscribirse />;
   if (perfil.tipo === 'recepcionista') {
     if (!perfil.idSede) {

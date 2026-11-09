@@ -6,7 +6,9 @@ import {
   validarVentanaCancelacion,
   validarCapacidadParaReserva,
   validarCapacidadParaListaEspera,
-  validarReduccionDeCupo
+  validarReduccionDeCupo,
+  validarInicioFuturo,
+  calcularAccionesClase
 } from './classPolicy.js';
 
 const AHORA = new Date('2026-10-18T12:00:00Z').getTime();
@@ -59,4 +61,58 @@ test('lista de espera sólo se admite con la clase completa', () => {
 test('no permite reducir la capacidad por debajo de los confirmados', () => {
   assert.doesNotThrow(() => validarReduccionDeCupo(20, 20));
   assert.throws(() => validarReduccionDeCupo(19, 20), { status: 409 });
+});
+
+test('el inicio debe quedar en el futuro al crear o cambiarlo', () => {
+  assert.doesNotThrow(() => validarInicioFuturo(horasDesdeAhora(1), AHORA));
+  assert.throws(() => validarInicioFuturo(horasDesdeAhora(0), AHORA), { status: 400 });
+  assert.throws(() => validarInicioFuturo('fecha inválida', AHORA), { status: 400 });
+});
+
+test('calcula acciones según horario, capacidad e inscripción propia', () => {
+  const clase = {
+    fechaInicio: horasDesdeAhora(24),
+    cupoDisponible: 1,
+    miInscripcion: null
+  };
+  assert.equal(calcularAccionesClase(clase, AHORA).puedeReservar, true);
+  assert.equal(
+    calcularAccionesClase({ ...clase, fechaInicio: horasDesdeAhora(48) }, AHORA).puedeReservar,
+    true
+  );
+  assert.equal(
+    calcularAccionesClase({ ...clase, fechaInicio: horasDesdeAhora(48.01) }, AHORA).puedeReservar,
+    false
+  );
+  assert.equal(calcularAccionesClase(clase, AHORA).puedeAnotarseListaEspera, false);
+  assert.equal(calcularAccionesClase({ ...clase, cupoDisponible: 0 }, AHORA).puedeReservar, false);
+  assert.equal(calcularAccionesClase({ ...clase, cupoDisponible: 0 }, AHORA).puedeAnotarseListaEspera, true);
+  assert.equal(
+    calcularAccionesClase({ ...clase, miInscripcion: { estado: 'confirmado' } }, AHORA).puedeCancelar,
+    true
+  );
+  assert.equal(
+    calcularAccionesClase({
+      ...clase,
+      miInscripcion: {
+        estado: 'notificado',
+        fechaExpiracionOferta: horasDesdeAhora(1).toISOString()
+      }
+    }, AHORA).puedeAceptarOferta,
+    true
+  );
+  assert.equal(
+    calcularAccionesClase(
+      { ...clase, fechaInicio: horasDesdeAhora(1), miInscripcion: { estado: 'confirmado' } },
+      AHORA
+    ).puedeCancelar,
+    false
+  );
+  assert.equal(
+    calcularAccionesClase(
+      { ...clase, fechaInicio: horasDesdeAhora(2), miInscripcion: { estado: 'confirmado' } },
+      AHORA
+    ).puedeCancelar,
+    true
+  );
 });

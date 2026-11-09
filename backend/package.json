@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "node --test",
+    "test:coverage": "c8 --check-coverage --per-file --lines 20 --functions 20 --branches 10 --include=src/modules/activities/services/activityService.js --include=src/modules/activities/repositories/activityRepository.js --include=src/modules/activities/repositories/inscriptionRepository.js npm test",
     "dev": "node --watch src/index.js",
     "start": "node src/index.js"
   },
@@ -20,5 +21,8 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "c8": "^12.0.0"
   }
 }

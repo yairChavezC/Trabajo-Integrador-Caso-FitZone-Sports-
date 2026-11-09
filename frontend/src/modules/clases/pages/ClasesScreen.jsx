@@ -24,6 +24,7 @@ export default function ClasesScreen() {
 
 function ClasesScreenContent() {
   const { sedes, sedeSeleccionada } = useSede();
+  const [incluirPasadas, setIncluirPasadas] = useState(false);
   const {
     clases,
     loading,
@@ -31,8 +32,9 @@ function ClasesScreenContent() {
     actionError,
     addClase,
     editClase,
-    removeClase
-  } = useClases();
+    removeClase,
+    isActionPending
+  } = useClases({ incluirPasadas });
   const sedesAgenda = sedeSeleccionada ? [sedeSeleccionada] : sedes;
   const [formData, setFormData] = useState({
     ...initialForm,
@@ -98,7 +100,7 @@ function ClasesScreenContent() {
     }
   };
 
-  if (loading) return <p className="clases-empty">Cargando clases...</p>;
+  if (loading && clases.length === 0) return <p className="clases-empty">Cargando clases...</p>;
   if (error) return <p className="clases-alert">Error: {error}</p>;
 
   return (
@@ -116,6 +118,14 @@ function ClasesScreenContent() {
             <h3 id="gestion-agenda-title">Administrar agenda</h3>
             <p>Creá clases con disciplina, instructor, horario, sede y capacidad máxima.</p>
           </div>
+          <label className="clases-filtro-pasadas">
+            <input
+              type="checkbox"
+              checked={incluirPasadas}
+              onChange={(event) => setIncluirPasadas(event.target.checked)}
+            />
+            Incluir clases pasadas
+          </label>
         </div>
         <ClaseForm
           formData={formData}
@@ -131,6 +141,7 @@ function ClasesScreenContent() {
           modoAdministracion
           onDelete={handleDelete}
           onEdit={handleEdit}
+          isActionPending={isActionPending}
         />
       </section>
     </div>

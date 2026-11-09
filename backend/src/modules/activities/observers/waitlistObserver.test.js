@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ConsoleWaitlistObserver, WaitlistSubject } from './waitlistObserver.js';
+import {
+  ConsoleWaitlistObserver,
+  WaitlistSubject
+} from './waitlistObserver.js';
 
 test('el subject notifica en orden a los observers suscriptos', async () => {
   const subject = new WaitlistSubject();
@@ -39,6 +42,35 @@ test('el unsubscribe evita futuras notificaciones al observer', async () => {
   await subject.notify({ idClase: 1 });
 
   assert.equal(notificaciones, 0);
+});
+
+test('un fallo en un observer no impide notificar a los siguientes', async () => {
+  const subject = new WaitlistSubject();
+  const notificaciones = [];
+  const errores = [];
+  const errorOriginal = console.error;
+  console.error = (...args) => errores.push(args);
+
+  subject.subscribe({
+    async update() {
+      throw new Error('Fallo del primer observer');
+    }
+  });
+  subject.subscribe({
+    async update(evento) {
+      notificaciones.push(evento);
+    }
+  });
+
+  try {
+    const evento = { idClase: 1 };
+    await subject.notify(evento);
+    assert.deepEqual(notificaciones, [evento]);
+    assert.equal(errores.length, 1);
+    assert.match(errores[0][0], /Error notificando Object/);
+  } finally {
+    console.error = errorOriginal;
+  }
 });
 
 test('el observer registra el aviso de la oferta sin persistencia externa', async () => {
