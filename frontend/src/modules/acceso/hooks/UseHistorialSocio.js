@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { httpClient } from '../../../core/api/httpClient.js';
+import { accesoService } from '../services/accesoService.js';
 
 export const useHistorialSocio = () => {
     const [historial, setHistorial] = useState([]);
@@ -8,10 +8,11 @@ export const useHistorialSocio = () => {
     useEffect(() => {
         const fetchHistorial = async () => {
             try {
-                const response = await httpClient.get('/accesses/me/historial');
-                setHistorial(response?.data?.data || response?.data || []);
+                const data = await accesoService.obtenerMiHistorial();
+                setHistorial(Array.isArray(data) ? data : []);
             } catch (err) {
-                console.error('Error cargando historial', err);
+                console.error('Error cargando historial:', err);
+                setHistorial([]);
             } finally {
                 setLoading(false);
             }

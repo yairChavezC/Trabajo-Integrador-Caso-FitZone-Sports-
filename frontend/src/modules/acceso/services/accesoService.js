@@ -47,5 +47,31 @@ export const accesoService = {
             const mensajeError = error.response?.data?.mensaje || error.message || 'Error al registrar el ingreso del cliente externo.';
             throw new Error(mensajeError);
         }
+    },
+
+    /**
+     * Consulta el aforo actual, el aforo máximo y los últimos movimientos de una sede (RF-05).
+     */
+    obtenerEstadoSede: async (sedeId) => {
+        try {
+            const response = await httpClient.get(`/accesses/estado/${sedeId}`);
+            return response?.data?.data || response?.data || response;
+        } catch (error) {
+            const mensajeError = error.response?.data?.mensaje || error.message || 'Error al obtener el estado de la sede.';
+            throw new Error(mensajeError);
+        }
+    },
+
+    /**
+     * Obtiene el historial personal de accesos del socio autenticado.
+     */
+    obtenerMiHistorial: async () => {
+        try {
+            const response = await httpClient.get('/accesses/me/historial');
+            return response?.data?.data || response?.data || [];
+        } catch (error) {
+            const mensajeError = error.response?.data?.mensaje || error.message || 'Error al obtener el historial de accesos.';
+            throw new Error(mensajeError);
+        }
     }
 };

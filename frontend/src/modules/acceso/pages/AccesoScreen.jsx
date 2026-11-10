@@ -3,7 +3,6 @@ import { useAcceso } from '../hooks/useAcceso.js';
 import { AforoCard } from '../components/AforoCard.jsx';
 import { LectorQRForm } from '../components/LectorQRForm.jsx';
 import { IngresoExternoModal } from '../components/IngresoExternoModal.jsx';
-import { httpClient } from '../../../core/api/httpClient.js';
 import { useSede } from '../../../shared/context/SedeContext.jsx';
 import { useAuth } from '../../../core/auth/AuthContext.jsx';
 import { accesoService } from '../services/accesoService.js';
@@ -18,19 +17,23 @@ export const AccesoScreen = () => {
     const sedeIdActual = sedeSeleccionada?.id || 1;
 
     const [aforoActual, setAforoActual] = useState(0);
+    const [aforoMaximo, setAforoMaximo] = useState(100);
     const [historial, setHistorial] = useState([]);
     const [showModalExterno, setShowModalExterno] = useState(false);
     const [loadingExterno, setLoadingExterno] = useState(false);
 
     const sincronizarEstadoBD = async (sedeId) => {
         try {
-            const response = await httpClient.get(`/accesses/estado/${sedeId}`);
-            const payload = response?.data?.data || response?.data || response;
+            const payload = await accesoService.obtenerEstadoSede(sedeId);
 
             if (payload) {
                 const aforoServidor = payload.aforoActual ?? payload.aforo;
                 if (typeof aforoServidor === 'number') {
                     setAforoActual(aforoServidor);
+                }
+
+                if (typeof payload.aforoMaximo === 'number') {
+                    setAforoMaximo(payload.aforoMaximo);
                 }
                 
                 const movimientosRaw = payload.ultimosMovimientos || payload.movimientos || [];
@@ -154,7 +157,7 @@ export const AccesoScreen = () => {
                 <div style={{ flex: '1 1 350px' }}>
                     <AforoCard 
                         aforoActual={aforoActual} 
-                        aforoMaximo={100} 
+                        aforoMaximo={aforoMaximo} 
                     />
                 </div>
             </div>
