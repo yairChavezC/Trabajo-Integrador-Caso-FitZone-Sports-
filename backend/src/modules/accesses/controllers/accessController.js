@@ -10,7 +10,6 @@ class AccessController {
             if (erroresValidacion.length > 0) return res.status(400).json({ success: false, errores: erroresValidacion });
             
             const resultado = await accessService.procesarEscaneoMolinete(dto.qrCode, dto.sedeId);
-            // Usamos 400 (regla de negocio de molinete) en vez de 403 para que httpClient no cierre la sesión del recepcionista
             if (!resultado.autorizado) return res.status(400).json({ success: false, mensaje: resultado.mensaje });
             return res.status(200).json({ success: true, data: resultado });
         } catch (error) {
@@ -25,7 +24,6 @@ class AccessController {
             if (erroresValidacion.length > 0) return res.status(400).json({ success: false, errores: erroresValidacion });
 
             const resultado = await accessService.procesarIngreso(dto.qrCode, dto.sedeId);
-            // Usamos 400 en vez de 403
             if (!resultado.autorizado) return res.status(400).json({ success: false, mensaje: resultado.mensaje });
             return res.status(200).json({ success: true, data: resultado });
         } catch (error) {
@@ -86,6 +84,28 @@ class AccessController {
         } catch (error) {
             console.error("Error al obtener historial del socio:", error);
             return res.status(500).json({ success: false, mensaje: "Error del servidor" });
+        }
+    }
+
+    async obtenerPadronOffline(req, res) {
+        try {
+            const padron = await accessService.obtenerPadronOffline();
+            return res.status(200).json({ success: true, data: padron });
+        } catch (error) {
+            return res.status(500).json({ success: false, mensaje: "Error al generar padrón offline." });
+        }
+    }
+
+    async sincronizarOffline(req, res) {
+        try {
+            const { eventos } = req.body;
+            if (!Array.isArray(eventos)) {
+                return res.status(400).json({ success: false, mensaje: "Se requiere un listado de eventos." });
+            }
+            const resultado = await accessService.sincronizarAccesosOffline(eventos);
+            return res.status(200).json({ success: true, data: resultado });
+        } catch (error) {
+            return res.status(500).json({ success: false, mensaje: "Error al sincronizar eventos offline." });
         }
     }
 } 

@@ -26,7 +26,6 @@ class AccessService {
         }
 
         const antiguedadMs = Date.now() - timestamp;
-        // Verificamos que no esté expirado (> 65s) ni tenga fecha futura inválida
         if (antiguedadMs > TIEMPO_EXPIRACION_QR_MS || antiguedadMs < -10000) {
             return { 
                 valido: false, 
@@ -42,19 +41,16 @@ class AccessService {
      */
     async procesarEscaneoMolinete(qrCode, sedeId) {
         try {
-            // 1. Validar formato y vigencia temporal del QR rotativo (RF-04)
             const validacionQR = this.validarFormatoYVigenciaQR(qrCode);
             if (!validacionQR.valido) {
                 return { autorizado: false, mensaje: validacionQR.mensaje };
             }
 
-            // 2. Buscar usuario y estado de suscripción
             const usuario = await accessRepository.findUserByQR(qrCode);
             if (!usuario) {
                 return { autorizado: false, mensaje: 'Socio no encontrado o QR inválido.' };
             }
 
-            // 3. Verificar si se encuentra dentro de alguna sucursal (RN-01)
             const estaAdentro = await accessRepository.checkAccesoActivoGlobal(usuario.id);
 
             if (estaAdentro) {
@@ -81,31 +77,26 @@ class AccessService {
      */
     async procesarIngreso(qrCode, sedeId) {
         try {
-            // 1. Validar vigencia del QR también si se invoca ingreso directo (RF-04)
             const validacionQR = this.validarFormatoYVigenciaQR(qrCode);
             if (!validacionQR.valido) {
                 throw new Error(validacionQR.mensaje);
             }
 
-            // 2. Verificar existencia del socio
             const usuario = await accessRepository.findUserByQR(qrCode);
             if (!usuario) {
                 throw new Error('Código QR inválido o socio inexistente.');
             }
 
-            // 3. Validar estado de la membresía (RF-02 / RF-04)
             const estadoMembresia = usuario.estado_suscripcion;
             if (estadoMembresia !== 'activa' && estadoMembresia !== 'activo') {
                 throw new Error('Acceso denegado: El socio no posee una membresía activa.');
             }
 
-            // 4. RN-01: Un socio no puede estar dentro de dos sedes a la vez
             const accesoActivo = await accessRepository.checkAccesoActivoGlobal(usuario.id);
             if (accesoActivo) {
                 throw new Error('Acceso denegado: El socio ya registra un ingreso activo en una sucursal (RN-01).');
             }
 
-            // 5. RF-05: Validar disponibilidad de aforo antes de permitir el ingreso
             let aforoPrevio = 0;
             if (typeof accessRepository.getAforoPorSede === 'function') {
                 aforoPrevio = await accessRepository.getAforoPorSede(sedeId);
@@ -114,7 +105,6 @@ class AccessService {
                 }
             }
 
-            // 6. Registrar el ingreso en base de datos
             const registro = await accessRepository.createAccess({ idSede: sedeId, idUserId: usuario.id });
 
             const aforoActual = typeof accessRepository.getAforoPorSede === 'function'
@@ -259,6 +249,57 @@ class AccessService {
             console.error("Error en obtenerHistorialSocio (Servicio):", error);
             throw error;
         }
+    }
+
+    /**
+     * RNF-01: Obtiene el padrón de socios para la réplica local del terminal de sede.
+     */
+    async obtenerPadronOffline() {
+        const socios = await accessRepository.getPadronOffline();
+        return {
+            fechaSincronizacion: new Date().toISOString(),
+            socios: Array.isArray(socios) ? socios : []
+        };
+    }
+
+   /**
+     * RNF-01 / ADR-007: Sincroniza en lote los accesos registrados en modo offline
+     * garantizando idempotencia y cumplimiento de RN-01.
+     */
+    async sincronizarAccesosOffline(eventos = []) {
+        const resultados = { procesados: 0, errores: 0 };
+
+        const eventosOrdenados = [...eventos].sort(
+            (a, b) => new Date(a.fechaEvento) - new Date(b.fechaEvento)
+        );
+
+        for (const ev of eventosOrdenados) {
+            try {
+                if (ev.tipoAccion === 'ingreso') {
+                    // Evita duplicar el ingreso si el socio ya figura adentro (Idempotencia / RN-01)
+                    const yaEstaAdentro = await accessRepository.checkAccesoActivoGlobal(ev.usuarioId);
+                    if (!yaEstaAdentro) {
+                        await accessRepository.createAccess({
+                            idSede: ev.sedeId,
+                            idUserId: ev.usuarioId,
+                            fechaEntrada: new Date(ev.fechaEvento)
+                        });
+                        resultados.procesados++;
+                    }
+                } else if (ev.tipoAccion === 'salida') {
+                    const salida = await accessRepository.registrarSalida(
+                        ev.usuarioId,
+                        ev.sedeId,
+                        ev.fechaEvento
+                    );
+                    if (salida) resultados.procesados++;
+                }
+            } catch (err) {
+                resultados.errores++;
+            }
+        }
+
+        return resultados;
     }
 }
 

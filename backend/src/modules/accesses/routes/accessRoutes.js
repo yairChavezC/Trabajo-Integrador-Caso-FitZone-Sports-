@@ -23,6 +23,10 @@ router.post('/scan', verificarToken, soloPersonal, accessController.registrarEsc
 router.get('/estado/:sedeId', verificarToken, soloPersonal, accessController.obtenerEstadoSede);
 router.post('/externo', verificarToken, soloPersonal, accessController.registrarExterno);
 
+// 📡 Rutas para Contingencia Offline y Sincronización Diferida (RNF-01)
+router.get('/padron-offline', verificarToken, soloPersonal, accessController.obtenerPadronOffline);
+router.post('/sincronizar-offline', verificarToken, soloPersonal, accessController.sincronizarOffline);
+
 // 🔒 Historial personal: Requiere token válido (accesible para el Socio logueado)
 router.get('/me/historial', verificarToken, accessController.obtenerHistorialSocio);
 

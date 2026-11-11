@@ -60,7 +60,7 @@ export const AccesoScreen = () => {
         }
     };
 
-    useEffect(() => {
+   useEffect(() => {
         if (sedeIdActual && rolNumerico !== 3) {
             sincronizarEstadoBD(sedeIdActual);
         }
@@ -68,7 +68,10 @@ export const AccesoScreen = () => {
 
     const handleEscanearQR = async (qrCode) => {
         try {
-            await registrarIngresoUI(qrCode, sedeIdActual);
+            const res = await registrarIngresoUI(qrCode, sedeIdActual);
+            if (typeof res?.aforoActual === 'number') {
+                setAforoActual(res.aforoActual);
+            }
             await sincronizarEstadoBD(sedeIdActual);
         } catch (err) {
             const nuevoRegistroError = {
@@ -142,6 +145,7 @@ export const AccesoScreen = () => {
                             <div style={{ padding: '1.25rem', backgroundColor: resultado.tipoAccion === 'ingreso' ? '#f0fdf4' : '#eff6ff', color: resultado.tipoAccion === 'ingreso' ? '#166534' : '#1e40af', borderRadius: '12px', borderLeft: `5px solid ${resultado.tipoAccion === 'ingreso' ? '#22c55e' : '#3b82f6'}`, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                                 <strong style={{ fontSize: '1.1rem' }}>
                                     {resultado.tipoAccion === 'ingreso' ? '✅ ¡Ingreso Autorizado! ' : '👋 ¡Salida Registrada! '}
+                                    {resultado.modoOffline && ' (Modo Offline)'}
                                 </strong> 
                                 <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem' }}>
                                     {resultado.tipoAccion === 'ingreso' 

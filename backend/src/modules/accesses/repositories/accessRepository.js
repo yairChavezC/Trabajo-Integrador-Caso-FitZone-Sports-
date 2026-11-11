@@ -56,14 +56,14 @@ const createAccess = async (accessData) => {
 /**
  * Registra la salida de un usuario de una sede.
  */
-const registrarSalida = async (idUserId, idSede) => {
+const registrarSalida = async (idUserId, idSede, fechaSalida = null) => {
     const query = `
         UPDATE control_acceso 
         SET fecha_salida = $1 
         WHERE id_usuario = $2 AND id_sede = $3 AND fecha_salida IS NULL 
         RETURNING *;
     `;
-    const values = [new Date(), idUserId, idSede];
+    const values = [fechaSalida ? new Date(fechaSalida) : new Date(), idUserId, idSede];
     const result = await pool.query(query, values);
     return result.rows[0]; 
 };
@@ -79,7 +79,7 @@ const getAforoPorSede = async (idSede) => {
         JOIN usuario u ON ca.id_usuario = u.id
         WHERE ca.id_sede = $1 
           AND ca.fecha_salida IS NULL
-          AND u.id_rol != 2; -- 👈 CAMBIADO A 2 (Cliente Externo)
+          AND u.id_rol != 2;
     `;
     const values = [idSede];
     const result = await pool.query(query, values);
@@ -113,10 +113,6 @@ const getUltimosMovimientosPorSede = async (idSede, limite = 5) => {
     }
 };
 
-// =====================================================================
-// NUEVAS FUNCIONES PARA EL CLIENTE EXTERNO
-// =====================================================================
-
 /**
  * Busca un usuario por DNI para evitar crear duplicados de clientes externos.
  */
@@ -142,7 +138,6 @@ const createUserPublic = async (userData) => {
             VALUES ($1, $2, $3, $4)
             RETURNING *;
         `;
-        // Mandamos '-' o un string vacío en el cuarto parámetro para cumplir con el NOT NULL de contacto
         const values = [nombre, dni, id_rol, '-']; 
         const result = await pool.query(query, values);
         return result.rows[0];
@@ -151,10 +146,6 @@ const createUserPublic = async (userData) => {
         throw error;
     }
 };
-
-// =====================================================================
-// NUEVA FUNCIÓN PARA EL HISTORIAL DEL SOCIO (Dashboard)
-// =====================================================================
 
 /**
  * Obtiene el historial personal de un socio específico.
@@ -175,7 +166,6 @@ const getHistorialByUser = async (userId) => {
         `;
         const result = await pool.query(query, [userId]);
         
-        // Mapeamos los datos para que el frontend los pueda leer en HistorialAccesosTable
         return result.rows.map(row => ({
             id: row.id,
             fecha_entrada: row.fecha_entrada,
@@ -184,6 +174,46 @@ const getHistorialByUser = async (userId) => {
         }));
     } catch (error) {
         console.error("Error en getHistorialByUser:", error);
+        return [];
+    }
+};
+
+/**
+ * RNF-01: Obtiene el padrón de socios y su estado actual para la réplica local de la terminal.
+ */
+const getPadronOffline = async () => {
+    try {
+        const queryUsuarios = `
+            SELECT 
+                u.id, 
+                u.nombre, 
+                u.id_rol,
+                LOWER(TRIM(s.estado)) AS estado_suscripcion
+            FROM usuario u
+            LEFT JOIN suscripcion s ON u.id = s.id_usuario
+        `;
+        const queryAdentro = `
+            SELECT DISTINCT id_usuario 
+            FROM control_acceso 
+            WHERE fecha_salida IS NULL
+        `;
+
+        const [resUsuarios, resAdentro] = await Promise.all([
+            pool.query(queryUsuarios),
+            pool.query(queryAdentro)
+        ]);
+
+        const usuariosAdentroSet = new Set(resAdentro.rows.map(r => Number(r.id_usuario)));
+
+        return resUsuarios.rows.map(u => ({
+            id: u.id,
+            nombre: u.nombre,
+            id_rol: u.id_rol,
+            estado_suscripcion: u.estado_suscripcion || 'inactiva',
+            esta_adentro: usuariosAdentroSet.has(Number(u.id))
+        }));
+    } catch (error) {
+        console.error("Error en getPadronOffline:", error);
         return [];
     }
 };
@@ -197,5 +227,6 @@ export default {
     getUltimosMovimientosPorSede,
     findUserByDni,
     createUserPublic,
-    getHistorialByUser
+    getHistorialByUser,
+    getPadronOffline
 };
