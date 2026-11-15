@@ -1,0 +1,207 @@
+/* Design Tokens Semánticos — Módulo de Control de Acceso (Unidad IV) */
+:root {
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #6b7280;
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f9fafb;
+  --color-border-subtle: #e5e7eb;
+  --color-border-divider: #f3f4f6;
+
+  --color-action-external: #10b981;
+  --color-action-external-hover: #059669;
+
+  --color-status-success-bg: #f0fdf4;
+  --color-status-success-badge: #dcfce7;
+  --color-status-success-text: #166534;
+  --color-status-success-border: #22c55e;
+
+  --color-status-info-bg: #eff6ff;
+  --color-status-info-badge: #e0e7ff;
+  --color-status-info-text: #1e40af;
+  --color-status-info-border: #3b82f6;
+
+  --color-status-danger-bg: #fef2f2;
+  --color-status-danger-badge: #fee2e2;
+  --color-status-danger-text: #b91c1c;
+  --color-status-danger-border: #ef4444;
+}
+
+.acceso-screen-container {
+  padding: 2rem 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.acceso-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--color-border-divider);
+  padding-bottom: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.acceso-title {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.acceso-subtitle {
+  margin: 0.25rem 0 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.acceso-btn-externo {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--color-action-external);
+  color: var(--color-surface-card);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.acceso-btn-externo:hover {
+  background-color: var(--color-action-external-hover);
+}
+
+.acceso-grid {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.acceso-col-scanner {
+  flex: 1 1 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.acceso-col-aforo {
+  flex: 1 1 350px;
+}
+
+.acceso-feedback-slot {
+  min-height: 80px;
+  margin-top: 1.5rem;
+}
+
+.acceso-alert {
+  padding: 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.acceso-alert--danger {
+  background-color: var(--color-status-danger-bg);
+  color: var(--color-status-danger-text);
+  border-left: 4px solid var(--color-status-danger-border);
+}
+
+.acceso-alert--success {
+  background-color: var(--color-status-success-bg);
+  color: var(--color-status-success-text);
+  border-left: 5px solid var(--color-status-success-border);
+}
+
+.acceso-alert--info {
+  background-color: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+  border-left: 5px solid var(--color-status-info-border);
+}
+
+.acceso-alert-text {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.95rem;
+}
+
+.acceso-history-card {
+  margin-top: 2.5rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: var(--color-surface-card);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.acceso-history-header {
+  background-color: var(--color-surface-subtle);
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.acceso-history-title {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.acceso-history-empty {
+  padding: 3rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
+
+.acceso-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.acceso-history-table thead tr {
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.acceso-history-table th,
+.acceso-history-table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border-divider);
+}
+
+.acceso-history-time {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.acceso-history-event {
+  color: var(--color-text-secondary);
+}
+
+.acceso-text-right {
+  text-align: right;
+}
+
+.acceso-badge {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.acceso-badge--success {
+  background-color: var(--color-status-success-badge);
+  color: var(--color-status-success-text);
+}
+
+.acceso-badge--info {
+  background-color: var(--color-status-info-badge);
+  color: var(--color-status-info-text);
+}
+
+.acceso-badge--danger {
+  background-color: var(--color-status-danger-badge);
+  color: var(--color-status-danger-text);
+}
