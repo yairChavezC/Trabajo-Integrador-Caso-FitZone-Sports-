@@ -5,10 +5,10 @@ Semana del 2026-08-25
 
 ### 2026-08-29 — 4 h
 **Actividad**
-Relevé los requisitos funcionales y no funcionales del Módulo 2 (Gimnasio y Control de Acceso: RF-04, RF-05, RN-01 y RNF-01), definí la estructura de la tabla `control_acceso` junto con sus claves foráneas hacia `usuario` y `sede`, y redacté la propuesta inicial de integración de pasarela de pagos (ADR-002) y el análisis de errores y rollback en los orquestadores.
+Relevé los requisitos funcionales y no funcionales del Módulo 2 (Gimnasio y Control de Acceso: RF-02, RF-04, RF-05, RN-01 y RNF-01), definí la estructura de la tabla `control_acceso` junto con sus claves foráneas hacia `usuario` y `sede`, y participé en la definición de la arquitectura modular del proyecto.
 
 **Decisión**
-Decidí modelar la presencia activa de un socio dentro de una sucursal mediante la condición `fecha_salida IS NULL` en la tabla `control_acceso` en lugar de mantener una columna contadora estática en `sede`. Esto garantiza que el cálculo de aforo (RF-05) y la verificación de acceso simultáneo (RN-01) sean transaccionalmente consistentes ante cualquier fallo intermedio. Ver ADR-001 y ADR-003.
+Decidí modelar la presencia activa de un socio dentro de una sucursal mediante la condición `fecha_salida IS NULL` en la tabla `control_acceso` en lugar de mantener una columna contadora fija en `sede`. Esto garantiza que el cálculo de aforo (RF-05) y la verificación de acceso simultáneo (RN-01) sean transaccionalmente consistentes ante cualquier fallo intermedio. Ver ADR-001 y ADR-006.
 
 **Problema o bloqueo**
 Surgió la duda en el equipo sobre si el ingreso al gimnasio requería reserva previa de turno horario o lista de espera como las clases grupales. Consultamos al docente de la cátedra y confirmamos que el acceso a musculación es libre con membresía activa, validándose únicamente en puerta mediante QR rotativo y disponibilidad de aforo en la sede.
@@ -29,27 +29,27 @@ Implementé las cinco capas del backend para el módulo `accesses` (`backend/src
 Estructuré el módulo aplicando el patrón *Repository* para aislar todas las consultas SQL (`pg Pool`) de la lógica de dominio en `accessService.js`, alineado con el monolito modular definido en ADR-001 y ADR-005. Para la regla RN-01 codifiqué `checkAccesoActivoGlobal` verificando ingresos sin fecha de salida en cualquier sucursal de la cadena.
 
 **Problema o bloqueo**
-Al consultar los datos del socio en `findUserByQR` haciendo `JOIN` con la tabla `suscripcion`, si un socio tenía renovaciones históricas la consulta devolvía múltiples registros y podía evaluar una suscripción vieja vencida en lugar de la vigente. Lo resolví ordenando las suscripciones por `s.id DESC LIMIT 1` dentro de un `LEFT JOIN` para tomar siempre el último plan del socio.
+Al consultar los datos del socio en `findUserByQR` haciendo `JOIN` con la tabla `suscripcion`, si un socio tenía renovaciones históricas la consulta devolvía múltiples registros y podía evaluar una suscripción anterior vencida en lugar de la vigente. Lo resolví ordenando las suscripciones por `s.id DESC LIMIT 1` dentro de un `LEFT JOIN` para tomar siempre el último plan del socio.
 
 **Commits**
 `2d6c0d6` feat(accesses): implementar capa DTO y Repository (T01, T02) `6158c36` feat(accesses): implementar capa de Service para la lógica de ingresos (T03) `a7044f0` feat(accesses): implementar Controller, Routes e integrar al appRouter (T04, T05)
 
 ### 2026-09-21 — 5 h
 **Actividad**
-Desarrollé la arquitectura cliente del Módulo 2 en el frontend (`frontend/src/modules/acceso/`): el servicio de comunicación `accesoService.js` (T06), el custom hook `UseAcceso.js` (T07) y la primera versión del panel de recepción y sus componentes visuales en `AccesoScreen.jsx` (T08, T09).
+Desarrollé la arquitectura cliente del Módulo 2 en el frontend (`frontend/src/modules/acceso/`): el servicio de comunicación `accesoService.js` (T06), el custom hook `useAcceso.js` (T07) y la primera versión del panel de recepción y sus componentes visuales en `AccesoScreen.jsx` (T08, T09).
 
 **Decisión**
-Encapsulé las llamadas HTTP y el manejo de estados asíncronos (`loading`, `error`, `resultado`) dentro del hook `UseAcceso.js` para mantener la vista `AccesoScreen.jsx` libre de lógica de comunicación directa, respetando el ADR-004.
+Encapsulé las llamadas HTTP y el manejo de estados asíncronos (`loading`, `error`, `resultado`) dentro del hook `useAcceso.js` para mantener la vista `AccesoScreen.jsx` libre de lógica de comunicación directa, respetando el ADR-004.
 
 **Problema o bloqueo**
-Cuando el backend devolvía un rechazo por regla de negocio (por ejemplo, membresía inactiva), la respuesta con código de error hacía que el componente mostrara un fallo genérico de conexión en vez del motivo exacto del rechazo. Ajusté el manejo de errores en `UseAcceso.js` y `accesoService.js` para extraer el mensaje de negocio del payload y presentarlo claramente al recepcionista.
+Cuando el backend devolvía un rechazo por regla de negocio (por ejemplo, membresía inactiva), la respuesta con código de error hacía que el componente mostrara un fallo genérico de conexión en vez del motivo exacto del rechazo. Ajusté el manejo de errores en `useAcceso.js` y `accesoService.js` para extraer el mensaje de negocio del payload y presentarlo claramente al recepcionista.
 
 **Commits**
 `afccc2c` feat(acceso): implementar capa de servicios y hooks (T06, T07) `d49a54c` feat(acceso): implementar panel de recepción y componentes UI (T08, T09)
 
 ---
 
-## Sprint 3 — Unidad III: Lógica de Egreso,Liberación de Aforo y Credencial Digital QR
+## Sprint 3 — Unidad III: Lógica de Egreso, Liberación de Aforo y Credencial Digital QR
 Semana del 2026-10-06
 
 ### 2026-10-14 — 6 h
@@ -103,13 +103,13 @@ Semana del 2026-10-26
 
 ### 2026-10-28 — 5 h
 **Actividad**
-Rediseñé el panel de recepción e implementé el registro de ingreso en puerta para **Clientes Externos** (`POST /api/accesses/externo`, `procesarIngresoExterno` y modal de carga rápida por DNI en `AccesoScreen.jsx`), junto con la tabla en vivo de *Últimos Movimientos en Puerta*.
+Rediseñé el panel de recepción e implementé la primera versión del registro de ingreso en puerta para **Clientes Externos** (`POST /api/accesses/externo`, `IngresoExternoModal.jsx` y `AccesoScreen.jsx`), junto con la tabla en vivo de *Últimos Movimientos en Puerta*.
 
 **Decisión**
 Decidí persistir el ingreso de los clientes externos en `control_acceso` asignándoles `id_rol = 2` para que queden auditados en el historial de puerta de la sucursal, pero excluirlos en la consulta `getAforoPorSede` (`AND u.id_rol != 2`) dado que asisten a canchas alquiladas y no ocupan el cupo de máquinas del gimnasio destinado a los socios (RF-05).
 
 **Problema o bloqueo**
-Si un socio con cuota vencida intentaba eludir el control de QR pidiendo que lo carguen manualmente por DNI en el botón "+ Ingreso Externo", el sistema podía registrarlo como visitante. Agregué una validación en `accessService.procesarIngresoExterno` que busca primero el DNI con `findUserByDni` y, si detecta que `id_rol === 3` (Socio), bloquea el alta manual exigiendo el uso de su credencial QR.
+Al registrar un cliente externo por primera vez, si no existía previamente en la tabla `usuario` la clave foránea de `control_acceso` fallaba. Implementé la búsqueda previa por DNI (`findUserByDni`) y el alta automática (`createUserPublic`) antes de insertar el movimiento de entrada.
 
 **Commits**
 `d421783` refactor(acceso): rediseño del panel de recepción y blindaje de arquitectura
@@ -121,7 +121,7 @@ Semana del 2026-11-08
 
 ### 2026-11-09 — 4 h
 **Actividad**
-Integré el middleware de autorización por roles (`soloPersonal`) en `accessRoutes.js` para restringir los endpoints operativos de recepción exclusivamente a recepcionistas, administradores y gerentes, dejando `/me/historial` accesible para el socio autenticado.
+Integré el middleware de autorización por roles (`soloPersonal`) en `accessRoutes.js` para restringir los endpoints operativos de recepción exclusivamente a recepcionistas y gerentes, dejando `/me/historial` accesible para el socio autenticado.
 
 **Decisión**
 Aplicar el control RBAC directamente en la capa de rutas del backend mediante middlewares encadenados (`verificarToken`, `soloPersonal`) además de la validación visual en React, impidiendo que un socio invoque `/api/accesses/scan` manualmente mediante herramientas como Postman.
@@ -167,18 +167,34 @@ Tuve dos bloqueos importantes al probar el corte de red real apagando el backend
 
 ---
 
-## Sprint 8 — Unidad V y Cierre: Cupo Real por Sede, Blindaje Offline y Pruebas Unitarias
-Semana del 2026-11-15
+## Sprint 8 — Unidad V y Cierre: Cupo Real por Sede, Refactorización con Patrones y Pruebas Unitarias
+Semana del 2026-11-14
+
+### 2026-11-14 — 5 h
+**Actividad**
+Reemplacé la constante fija de aforo (`100`) por la consulta dinámica a la columna `cupo` de la tabla `sede` en PostgreSQL (`accessRepository.getCupoSede`, RF-05), blindé en el modo offline el control de sede activa (`id_sede_activa` para RN-01 entre sedes distintas) y el tope de cupo local, y estructuré la carpeta `docs/` con la bitácora y los ADRs del módulo.
+
+**Decisión**
+Incluí en el padrón replicado (`getPadronOffline`) la subconsulta `id_sede_activa` y crucé en `validarEscaneoLocalOffline` el aforo local contra el `cupo` guardado en `fitzone_sedes_offline`. Así logré paridad funcional entre el modo online y offline para el control multi-sede (RN-01) y el límite de capacidad por sucursal (RF-05).
+
+**Problema o bloqueo**
+En modo offline no se estaba distinguiendo en cuál de las sucursales había ingresado el socio (solo figuraba `esta_adentro: true`), por lo que cambiar de sede en el selector con el backend apagado y volver a escanear al mismo socio le registraba una salida en la segunda sede en lugar de rechazarlo por RN-01. Al persistir y validar `id_sede_activa` localmente, el bloqueo multi-sede quedó operativo también sin red.
+
+**Commits**
+`80608b5` fix(accesses): vincular aforo maximo en tiempo real con el cupo de cada sede en BD (RF-05) `dee29a2` test(accesses): agregar suite de pruebas unitarias y cobertura para accessService `61b4e96` feat(accesses): validar sede activa (RN-01) y tope de cupo por sucursal (RF-05) en modo offline `7c6537e` docs: crear estructura de documentación y bitácora individual de acceso
 
 ### 2026-11-15 — 6 h
 **Actividad**
-Reemplacé la constante fija de aforo (`100`) por la consulta dinámica a la columna `cupo` de la tabla `sede` en PostgreSQL (`accessRepository.getCupoSede`, RF-05). Desarrollé la suite de pruebas unitarias `accessService.test.js` con `node:test` y `c8`, y blindé en el modo offline el control de sede activa (`id_sede_activa` para RN-01 entre sedes distintas) y el tope de cupo local.
+Integré la validación de roles en el flujo de Clientes Externos (`id_rol = 2` vs `id_rol = 3`), refactoricé el módulo aplicando patrones de diseño (Inyección de Dependencias por constructor con reloj inyectable, Strategy/Pipeline OCP de reglas de admisión, `CreateExternalAccessDTO`, Patrón Adapter para `localStorage`, Design Tokens semánticos y Atomic Design) y amplié la suite `accessService.test.js` a 15 pruebas unitarias con análisis de valores límite (*Boundary Value Analysis*), alcanzando un `79.62%` de cobertura en `accessService.js` (`85.83%` global en el backend).
 
 **Decisión**
-Incluí en el padrón replicado (`getPadronOffline`) la subconsulta `id_sede_activa` y crucé en `validarEscaneoLocalOffline` el aforo local contra el `cupo` guardado en `fitzone_sedes_offline`. Así logré que, aún con el backend apagado, si un socio entra en una sede e intenta escanear su QR en otra sucursal distinta, el modo offline lo bloquee por RN-01 exactamente igual que el servidor online.
+1. Inyectar el repositorio y un reloj (`clock`) por constructor en `AccessService` y modelar `RF-02`, `RN-01` y `RF-05` mediante el pipeline `REGLAS_ADMISION_INGRESO` (Principio Abierto-Cerrado), eliminando la doble consulta SQL en `procesarEscaneoMolinete` y permitiendo pruebas unitarias determinísticas con un Stub de reloj fijo.
+2. En el registro de Clientes Externos (`POST /api/accesses/externo`), validar con `CreateExternalAccessDTO` el formato de DNI (7 a 9 dígitos) y verificar el rol en BD: reutilizar la cuenta existente si ya es Cliente Externo (`id_rol = 2`) y rechazar el ingreso manual si el DNI pertenece a un Socio (`id_rol = 3`) exigiéndole escanear su credencial QR (RF-04).
+3. Encapsular el acceso a `localStorage` en `offlineStorageAdapter` (Patrón Adapter, alineado con el ADR-006) y migrar los estilos de `AccesoScreen` a Design Tokens semánticos en CSS reutilizando el organismo `HistorialAccesosTable`.
 
 **Problema o bloqueo**
-En modo offline no se estaba distinguiendo en cuál de las sucursales había ingresado el socio (solo figuraba `esta_adentro: true`), por lo que cambiar de sede en el selector con el backend apagado y volver a escanear al mismo socio le registraba una salida en la segunda sede en lugar de rechazarlo por RN-01. Al incorporar `id_sede_activa` tanto en la réplica de BD como en la actualización local de `localStorage`, el bloqueo multi-sede quedó funcionando tanto online como offline, y la suite de 9 tests unitarios alcanzó un `65.61%` de cobertura en `accessService.js`.
+1. Al dar de alta un Cliente Externo nuevo desde recepción, PostgreSQL arrojaba `null value in column "password" of relation "usuario" violates not-null constraint`. Lo resolví en `accessRepository.createUserPublic` asignando como contraseña inicial el DNI hasheado con SHA-256 (`encode(digest($4, 'sha256'), 'hex')`) y un contacto único `externo.<dni>@fitzone.com`.
+2. Las pruebas del vencimiento del QR dependían de `Date.now()` real; al inyectar el Stub de reloj fijo en `AccessService`, pude testear los casos borde exactos (`65.000 ms` vs `65.001 ms`) sin falsos positivos.
 
 **Commits**
-`80608b5` fix(accesses): vincular aforo maximo en tiempo real con el cupo de cada sede en BD (RF-05) `dee29a2` test(accesses): agregar suite de pruebas unitarias y cobertura para accessService `61b4e96` feat(accesses): validar sede activa (RN-01) y tope de cupo por sucursal (RF-05) en modo offline
+`6a93887` fix(accesses): validar roles en ingreso externo y reutilizar cuentas existentes por DNI `47a8f64` refactor(accesses): aplicar DI, pipeline de reglas OCP y pruebas de casos borde en backend `694a0c0` refactor(acceso): aplicar patron Adapter en localStorage, Design Tokens semanticos y Atomic Design
