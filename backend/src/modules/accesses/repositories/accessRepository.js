@@ -114,13 +114,22 @@ const getUltimosMovimientosPorSede = async (idSede, limite = 5) => {
 };
 
 /**
- * Busca un usuario por DNI para evitar crear duplicados de clientes externos.
+ * Busca un usuario por DNI (ignorando espacios laterales) para validar si ya existe
+ * como socio o como cliente externo registrado.
  */
 const findUserByDni = async (dni) => {
     try {
-        const query = `SELECT * FROM usuario WHERE dni = $1 LIMIT 1;`;
-        const result = await pool.query(query, [dni]);
-        return result.rows[0];
+        const dniLimpio = String(dni || '').trim();
+        const query = `
+            SELECT u.*, LOWER(TRIM(s.estado)) AS estado_suscripcion
+            FROM usuario u
+            LEFT JOIN suscripcion s ON u.id = s.id_usuario
+            WHERE TRIM(u.dni) = $1
+            ORDER BY s.id DESC
+            LIMIT 1;
+        `;
+        const result = await pool.query(query, [dniLimpio]);
+        return result.rows[0] || null;
     } catch (error) {
         console.error("Error al buscar usuario por DNI:", error);
         return null;
@@ -128,17 +137,22 @@ const findUserByDni = async (dni) => {
 };
 
 /**
- * Crea el perfil del cliente externo en la tabla de usuarios de PostgreSQL.
+ * Crea el perfil del cliente externo (id_rol = 2) en la tabla usuario cuando no estaba registrado.
+ * Se asigna su DNI hasheado como contraseña inicial para cumplir la restricción NOT NULL de la BD.
  */
 const createUserPublic = async (userData) => {
     const { nombre, dni, id_rol } = userData;
+    const dniLimpio = String(dni).trim();
+    const nombreLimpio = String(nombre).trim();
+    const contactoGenerado = `externo.${dniLimpio}@fitzone.com`;
+
     try {
         const query = `
-            INSERT INTO usuario (nombre, dni, id_rol, contacto)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *;
+            INSERT INTO usuario (nombre, dni, contacto, password, id_rol, activo)
+            VALUES ($1, $2, $3, encode(digest($4, 'sha256'), 'hex'), $5, true)
+            RETURNING id, nombre, dni, contacto, id_rol, activo;
         `;
-        const values = [nombre, dni, id_rol, '-']; 
+        const values = [nombreLimpio, dniLimpio, contactoGenerado, dniLimpio, id_rol || 2]; 
         const result = await pool.query(query, values);
         return result.rows[0];
     } catch (error) {

@@ -63,7 +63,11 @@ class AccessController {
             const resultado = await accessService.registrarIngresoExterno({ nombre, dni, sedeId });
             return res.status(201).json({ success: true, data: resultado });
         } catch (error) {
-            return res.status(500).json({ success: false, mensaje: error.message || 'Error interno al registrar cliente externo.' });
+            const status = error.statusCode || 500;
+            return res.status(status).json({
+                success: false,
+                mensaje: error.message || 'Error interno al registrar cliente externo.'
+            });
         }
     }
 

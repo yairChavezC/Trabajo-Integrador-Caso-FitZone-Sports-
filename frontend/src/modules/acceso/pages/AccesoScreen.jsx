@@ -90,16 +90,18 @@ export const AccesoScreen = () => {
     const handleIngresoExterno = async (datos) => {
         setLoadingExterno(true);
         try {
-            await accesoService.registrarIngresoExterno(datos, sedeIdActual);
-            setHistorial(prev => [{ 
-                id: Date.now(), 
-                hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute:'2-digit', second:'2-digit' }), 
-                evento: `Ingreso Externo (${datos.nombre})`, 
-                estado: 'Autorizado' 
-            }, ...prev].slice(0, 5));
+            const res = await accesoService.registrarIngresoExterno(datos, sedeIdActual);
+            const payload = res?.data || res;
+            const nombreReal = payload?.usuario?.nombre || datos.nombre;
+
             setShowModalExterno(false);
+            await sincronizarEstadoBD(sedeIdActual);
+
+            if (payload?.mensaje) {
+                alert(`✅ ${payload.mensaje}`);
+            }
         } catch (err) {
-            alert(err.message);
+            alert(`❌ ${err.message}`);
         } finally {
             setLoadingExterno(false);
         }

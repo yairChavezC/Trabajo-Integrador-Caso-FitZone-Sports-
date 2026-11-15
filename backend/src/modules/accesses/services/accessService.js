@@ -184,49 +184,85 @@ class AccessService {
             };
         }
     }
-    /**
-     * Registra un cliente externo en la tabla usuarios y marca el ingreso (no suma al aforo).
+   /**
+     * Registra el acceso en puerta de un Cliente Externo (id_rol = 2):
+     * - Si el DNI pertenece a un Socio (id_rol = 3) o Personal (1, 4), bloquea la carga manual y exige QR.
+     * - Si el DNI ya existe como Cliente Externo (id_rol = 2), reutiliza su cuenta existente sin duplicarla.
+     * - Si el DNI no existe, crea la cuenta con id_rol = 2 y registra el acceso (sin sumar al aforo de socios).
      */
     async registrarIngresoExterno({ nombre, dni, sedeId }) {
-        try {
-            let usuarioBd = null;
+        const dniLimpio = String(dni || '').trim();
+        const nombreLimpio = String(nombre || '').trim();
 
-            if (typeof accessRepository.findUserByDni === 'function') {
-                 usuarioBd = await accessRepository.findUserByDni(dni);
-            }
-
-            if (!usuarioBd) {
-                 const ROL_CLIENTE_EXTERNO = 2;
-                 if (typeof accessRepository.createUserPublic === 'function') {
-                     usuarioBd = await accessRepository.createUserPublic({
-                         nombre: nombre,
-                         dni: dni,
-                         id_rol: ROL_CLIENTE_EXTERNO
-                     });
-                 }
-            }
-
-            const registro = await accessRepository.createAccess({ 
-                idSede: sedeId, 
-                idUserId: usuarioBd.id 
-            });
-
-            return {
-                autorizado: true,
-                tipoAccion: 'ingreso',
-                mensaje: `Cliente externo ${nombre} registrado con éxito.`,
-                usuario: {
-                    id: usuarioBd.id,
-                    nombre: usuarioBd.nombre,
-                    rol: 'cliente_externo'
-                },
-                acceso: registro
-            };
-
-        } catch (error) {
-            console.error("Error en registrarIngresoExterno:", error);
-            throw error;
+        if (!dniLimpio || !nombreLimpio) {
+            const err = new Error('El nombre y el DNI son obligatorios.');
+            err.statusCode = 400;
+            throw err;
         }
+
+        let usuarioBd = null;
+        if (typeof accessRepository.findUserByDni === 'function') {
+            usuarioBd = await accessRepository.findUserByDni(dniLimpio);
+        }
+
+        const ROL_CLIENTE_EXTERNO = 2;
+        const ROL_SOCIO = 3;
+        let yaEstabaRegistrado = false;
+
+        if (usuarioBd) {
+            const rolUsuario = Number(usuarioBd.id_rol);
+
+            // 1. Si el DNI es de un SOCIO (id_rol = 3), prohibimos que entre como externo sin QR
+            if (rolUsuario === ROL_SOCIO) {
+                const err = new Error(
+                    `Acceso denegado por esta vía: El DNI ${dniLimpio} pertenece al socio registrado "${usuarioBd.nombre}". Debe validar su ingreso escaneando su código QR dinámico.`
+                );
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // 2. Si el DNI es de personal del gimnasio (Recepcionista = 1 o Gerente = 4)
+            if (rolUsuario !== ROL_CLIENTE_EXTERNO) {
+                const err = new Error(
+                    `El DNI ${dniLimpio} pertenece a un usuario interno del sistema (${usuarioBd.nombre}) y no a un cliente externo.`
+                );
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // 3. Si es id_rol === 2, es un Cliente Externo que ya tenía cuenta creada: la reutilizamos
+            yaEstabaRegistrado = true;
+        } else {
+            // 4. Si no existe en la BD, lo creamos como Cliente Externo (id_rol = 2)
+            if (typeof accessRepository.createUserPublic === 'function') {
+                usuarioBd = await accessRepository.createUserPublic({
+                    nombre: nombreLimpio,
+                    dni: dniLimpio,
+                    id_rol: ROL_CLIENTE_EXTERNO
+                });
+            }
+        }
+
+        const registro = await accessRepository.createAccess({ 
+            idSede: sedeId, 
+            idUserId: usuarioBd.id 
+        });
+
+        return {
+            autorizado: true,
+            tipoAccion: 'ingreso',
+            yaEstabaRegistrado,
+            mensaje: yaEstabaRegistrado
+                ? `Ingreso registrado para el cliente externo existente: ${usuarioBd.nombre} (DNI ${usuarioBd.dni}).`
+                : `Nuevo cliente externo ${usuarioBd.nombre} dado de alta e ingresado con éxito.`,
+            usuario: {
+                id: usuarioBd.id,
+                nombre: usuarioBd.nombre,
+                dni: usuarioBd.dni,
+                rol: 'cliente_externo'
+            },
+            acceso: registro
+        };
     }
 /**
      * Obtiene el aforo actual, el aforo máximo real (cupo) y los últimos movimientos de una sede.
