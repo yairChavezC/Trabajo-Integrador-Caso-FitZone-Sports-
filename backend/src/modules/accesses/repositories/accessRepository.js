@@ -217,6 +217,20 @@ const getPadronOffline = async () => {
         return [];
     }
 };
+/**
+ * RF-05: Obtiene la capacidad máxima (cupo) configurada para una sede específica.
+ */
+const getCupoSede = async (idSede) => {
+    try {
+        const query = `SELECT cupo FROM sede WHERE id = $1 LIMIT 1;`;
+        const result = await pool.query(query, [idSede]);
+        const cupo = Number(result.rows[0]?.cupo);
+        return cupo > 0 ? cupo : 100;
+    } catch (error) {
+        console.error("Error al obtener cupo de la sede:", error);
+        return 100;
+    }
+};
 
 export default {
     findUserByQR,
@@ -224,6 +238,7 @@ export default {
     createAccess,
     registrarSalida, 
     getAforoPorSede,
+    getCupoSede,
     getUltimosMovimientosPorSede,
     findUserByDni,
     createUserPublic,

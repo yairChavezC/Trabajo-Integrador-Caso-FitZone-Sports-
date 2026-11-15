@@ -61,10 +61,13 @@ export const AccesoScreen = () => {
     };
 
    useEffect(() => {
+        if (sedeSeleccionada?.cupo) {
+            setAforoMaximo(Number(sedeSeleccionada.cupo));
+        }
         if (sedeIdActual && rolNumerico !== 3) {
             sincronizarEstadoBD(sedeIdActual);
         }
-    }, [sedeIdActual, rolNumerico]);
+    }, [sedeIdActual, sedeSeleccionada, rolNumerico]);
 
     const handleEscanearQR = async (qrCode) => {
         try {

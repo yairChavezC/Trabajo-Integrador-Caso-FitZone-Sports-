@@ -72,7 +72,7 @@ class AccessService {
         }
     }
     
-    /**
+/**
      * Procesa y valida el ingreso de un socio a la sucursal.
      */
     async procesarIngreso(qrCode, sedeId) {
@@ -97,10 +97,15 @@ class AccessService {
                 throw new Error('Acceso denegado: El socio ya registra un ingreso activo en una sucursal (RN-01).');
             }
 
+            // RF-05: Obtenemos el cupo real de la sede y validamos disponibilidad de aforo
+            const aforoMaximoSede = typeof accessRepository.getCupoSede === 'function'
+                ? await accessRepository.getCupoSede(sedeId)
+                : AFORO_MAXIMO_DEFAULT;
+
             let aforoPrevio = 0;
             if (typeof accessRepository.getAforoPorSede === 'function') {
                 aforoPrevio = await accessRepository.getAforoPorSede(sedeId);
-                if (aforoPrevio >= AFORO_MAXIMO_DEFAULT) {
+                if (aforoPrevio >= aforoMaximoSede) {
                     throw new Error('Acceso denegado: La sucursal ha alcanzado su capacidad máxima de aforo.');
                 }
             }
@@ -117,7 +122,7 @@ class AccessService {
                 mensaje: 'Ingreso exitoso',
                 usuarioId: usuario.id,
                 aforoActual: aforoActual,
-                aforoMaximo: AFORO_MAXIMO_DEFAULT,
+                aforoMaximo: aforoMaximoSede,
                 horaIngreso: registro.fecha_entrada
             };
 
@@ -158,13 +163,17 @@ class AccessService {
                 aforoActual = await accessRepository.getAforoPorSede(sedeId);
             }
 
+            const aforoMaximoSede = typeof accessRepository.getCupoSede === 'function'
+                ? await accessRepository.getCupoSede(sedeId)
+                : AFORO_MAXIMO_DEFAULT;
+
             return {
                 autorizado: true,
                 tipoAccion: 'salida',
                 mensaje: "Salida registrada correctamente.",
                 usuarioId: usuario.id,
                 aforoActual: aforoActual,
-                aforoMaximo: AFORO_MAXIMO_DEFAULT,
+                aforoMaximo: aforoMaximoSede,
                 data: salida
             };
         } catch (error) {
@@ -175,7 +184,6 @@ class AccessService {
             };
         }
     }
-
     /**
      * Registra un cliente externo en la tabla usuarios y marca el ingreso (no suma al aforo).
      */
@@ -220,17 +228,21 @@ class AccessService {
             throw error;
         }
     }
-
-    /**
-     * Obtiene el aforo actual, el aforo máximo y los últimos movimientos de una sede.
+/**
+     * Obtiene el aforo actual, el aforo máximo real (cupo) y los últimos movimientos de una sede.
      */
     async obtenerEstadoSede(sedeId) {
         try {
-            const aforoActual = await accessRepository.getAforoPorSede(sedeId);
-            const ultimosMovimientos = await accessRepository.getUltimosMovimientosPorSede(sedeId);
+            const [aforoActual, aforoMaximo, ultimosMovimientos] = await Promise.all([
+                accessRepository.getAforoPorSede(sedeId),
+                typeof accessRepository.getCupoSede === 'function'
+                    ? accessRepository.getCupoSede(sedeId)
+                    : Promise.resolve(AFORO_MAXIMO_DEFAULT),
+                accessRepository.getUltimosMovimientosPorSede(sedeId)
+            ]);
             return { 
                 aforoActual, 
-                aforoMaximo: AFORO_MAXIMO_DEFAULT, 
+                aforoMaximo, 
                 ultimosMovimientos 
             };
         } catch (error) {
@@ -238,7 +250,6 @@ class AccessService {
             throw error;
         }
     }
-
     /**
      * Obtiene el historial de accesos de un usuario específico.
      */
