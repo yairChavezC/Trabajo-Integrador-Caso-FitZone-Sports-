@@ -37,7 +37,7 @@ export const accesoService = {
         }
     },
 
-    /**
+   /**
      * Valida un código QR localmente contra la réplica guardada en el terminal de sede (RNF-01).
      */
     validarEscaneoLocalOffline: (qrCode, sedeId) => {
@@ -71,12 +71,35 @@ export const accesoService = {
             throw new Error('Acceso denegado: El socio no posee una membresía activa.');
         }
 
-        const tipoAccion = socio.esta_adentro ? 'salida' : 'ingreso';
-        const fechaEvento = new Date().toISOString();
         const sedeIdNorm = Number(sedeId) || 1;
 
-        // 1. Invertimos el estado en el padrón local
+        // RN-01: Si el socio está adentro, verificamos que sea en ESTA misma sede y no en otra sucursal
+        if (socio.esta_adentro && socio.id_sede_activa && Number(socio.id_sede_activa) !== sedeIdNorm) {
+            throw new Error('Acceso denegado: El socio ya registra un ingreso activo en otra sucursal (RN-01).');
+        }
+
+        const tipoAccion = socio.esta_adentro ? 'salida' : 'ingreso';
+        const fechaEvento = new Date().toISOString();
+
+        // Leemos el estado local de la sede y el catálogo offline de sedes para conocer su cupo real (RF-05)
+        const keySede = `${STORAGE_ESTADO_SEDE_PREFIX}${sedeIdNorm}`;
+        const estadoSedeLocal = JSON.parse(
+            localStorage.getItem(keySede) || '{"aforoActual":0,"aforoMaximo":100,"ultimosMovimientos":[]}'
+        );
+
+        const sedesOffline = JSON.parse(localStorage.getItem('fitzone_sedes_offline') || '[]');
+        const sedeInfo = sedesOffline.find(s => Number(s.id) === sedeIdNorm);
+        const cupoMaximoSede = Number(sedeInfo?.cupo) || Number(estadoSedeLocal.aforoMaximo) || 100;
+        const aforoPrevio = Number(estadoSedeLocal.aforoActual) || 0;
+
+        // RF-05: Si es un ingreso de socio, verificamos que no supere el cupo máximo de la sucursal
+        if (tipoAccion === 'ingreso' && Number(socio.id_rol) !== 2 && aforoPrevio >= cupoMaximoSede) {
+            throw new Error('Acceso denegado: La sucursal ha alcanzado su capacidad máxima de aforo.');
+        }
+
+        // 1. Invertimos el estado de presencia y actualizamos la sede activa en el padrón local
         padronData.socios[socioIndex].esta_adentro = !socio.esta_adentro;
+        padronData.socios[socioIndex].id_sede_activa = tipoAccion === 'ingreso' ? sedeIdNorm : null;
         localStorage.setItem(STORAGE_PADRON_KEY, JSON.stringify(padronData));
 
         // 2. Guardamos el evento en la cola local
@@ -92,18 +115,12 @@ export const accesoService = {
         localStorage.setItem(STORAGE_COLA_KEY, JSON.stringify(colaActual));
 
         // 3. Actualizamos el estado local de la sede en localStorage
-        const keySede = `${STORAGE_ESTADO_SEDE_PREFIX}${sedeIdNorm}`;
-        const estadoSedeLocal = JSON.parse(
-            localStorage.getItem(keySede) || '{"aforoActual":0,"aforoMaximo":100,"ultimosMovimientos":[]}'
-        );
-
-        const aforoPrevio = Number(estadoSedeLocal.aforoActual) || 0;
-        // Solo sumamos/restamos aforo si no es cliente externo (rol != 2)
         if (Number(socio.id_rol) !== 2) {
             estadoSedeLocal.aforoActual = tipoAccion === 'salida' 
                 ? Math.max(0, aforoPrevio - 1) 
                 : aforoPrevio + 1;
         }
+        estadoSedeLocal.aforoMaximo = cupoMaximoSede;
 
         const nuevoMov = {
             id: `OFF-MOV-${Date.now()}`,
@@ -119,7 +136,7 @@ export const accesoService = {
 
         localStorage.setItem(keySede, JSON.stringify(estadoSedeLocal));
 
-        console.info(`⚡ [Modo Offline] ${tipoAccion.toUpperCase()} validado localmente (${socio.nombre}). Aforo local: ${estadoSedeLocal.aforoActual}. Pendientes: ${colaActual.length}`);
+        console.info(`⚡ [Modo Offline] ${tipoAccion.toUpperCase()} validado localmente (${socio.nombre}). Aforo local: ${estadoSedeLocal.aforoActual}/${cupoMaximoSede}. Pendientes: ${colaActual.length}`);
 
         return {
             autorizado: true,
@@ -129,7 +146,7 @@ export const accesoService = {
             usuarioId: socio.id,
             nombreSocio: socio.nombre,
             aforoActual: estadoSedeLocal.aforoActual,
-            aforoMaximo: estadoSedeLocal.aforoMaximo || 100,
+            aforoMaximo: cupoMaximoSede,
             ultimosMovimientos: estadoSedeLocal.ultimosMovimientos,
             horaIngreso: fechaEvento
         };

@@ -179,42 +179,47 @@ const getHistorialByUser = async (userId) => {
 };
 
 /**
- * RNF-01: Obtiene el padrón de socios y su estado actual para la réplica local de la terminal.
+ * RNF-01: Obtiene el padrón resumido de usuarios y su estado de membresía/presencia actual
+ * para ser replicado localmente en la terminal de cada sede (contingencia offline).
  */
 const getPadronOffline = async () => {
     try {
-        const queryUsuarios = `
+        const query = `
             SELECT 
                 u.id, 
+                u.dni, 
                 u.nombre, 
                 u.id_rol,
-                LOWER(TRIM(s.estado)) AS estado_suscripcion
+                COALESCE(
+                    (SELECT s.estado 
+                     FROM suscripcion s 
+                     WHERE s.id_usuario = u.id 
+                     ORDER BY s.id DESC 
+                     LIMIT 1), 
+                    'inactiva'
+                ) AS estado_suscripcion,
+                EXISTS (
+                    SELECT 1 
+                    FROM control_acceso ca 
+                    WHERE ca.id_usuario = u.id 
+                      AND ca.fecha_salida IS NULL
+                ) AS esta_adentro,
+                (
+                    SELECT ca.id_sede 
+                    FROM control_acceso ca 
+                    WHERE ca.id_usuario = u.id 
+                      AND ca.fecha_salida IS NULL 
+                    ORDER BY ca.fecha_entrada DESC 
+                    LIMIT 1
+                ) AS id_sede_activa
             FROM usuario u
-            LEFT JOIN suscripcion s ON u.id = s.id_usuario
+            WHERE u.activo = true;
         `;
-        const queryAdentro = `
-            SELECT DISTINCT id_usuario 
-            FROM control_acceso 
-            WHERE fecha_salida IS NULL
-        `;
-
-        const [resUsuarios, resAdentro] = await Promise.all([
-            pool.query(queryUsuarios),
-            pool.query(queryAdentro)
-        ]);
-
-        const usuariosAdentroSet = new Set(resAdentro.rows.map(r => Number(r.id_usuario)));
-
-        return resUsuarios.rows.map(u => ({
-            id: u.id,
-            nombre: u.nombre,
-            id_rol: u.id_rol,
-            estado_suscripcion: u.estado_suscripcion || 'inactiva',
-            esta_adentro: usuariosAdentroSet.has(Number(u.id))
-        }));
+        const result = await pool.query(query);
+        return result.rows;
     } catch (error) {
-        console.error("Error en getPadronOffline:", error);
-        return [];
+        console.error("Error al obtener padrón offline en el repositorio:", error);
+        throw error;
     }
 };
 /**
