@@ -1,14 +1,72 @@
 import accessRepository from '../repositories/accessRepository.js';
 
-// Constantes de reglas de negocio (RF-04 y RF-05)
+// Constantes de dominio (RF-04, RF-05 y Roles)
 const TIEMPO_EXPIRACION_QR_MS = 65 * 1000; // 60 seg de rotación + 5 seg de tolerancia de red
+const TOLERANCIA_DESFASE_RELOJ_MS = -10 * 1000;
 const AFORO_MAXIMO_DEFAULT = 100;
+const ROL_CLIENTE_EXTERNO = 2;
+const ROL_SOCIO = 3;
 
-class AccessService {
-    
+/**
+ * Patrón Strategy / Pipeline de Reglas de Admisión (OCP - Unidad III):
+ * Cada regla encapsula una condición de negocio independiente para autorizar el ingreso.
+ * Si mañana se agrega una regla nueva (ej. apto médico vigente), se añade a esta lista
+ * sin modificar el flujo del molinete.
+ */
+const REGLAS_ADMISION_INGRESO = [
+    {
+        codigo: 'RF-02',
+        evaluar: async ({ usuario }) => {
+            const estado = (usuario.estado_suscripcion || '').toLowerCase().trim();
+            if (estado !== 'activa' && estado !== 'activo') {
+                return 'Acceso denegado: El socio no posee una membresía activa.';
+            }
+            return null;
+        }
+    },
+    {
+        codigo: 'RN-01',
+        evaluar: async ({ usuario, estaAdentroPreviamente, repo }) => {
+            const accesoActivo = estaAdentroPreviamente !== undefined
+                ? estaAdentroPreviamente
+                : await repo.checkAccesoActivoGlobal(usuario.id);
+
+            if (accesoActivo) {
+                return 'Acceso denegado: El socio ya registra un ingreso activo en una sucursal (RN-01).';
+            }
+            return null;
+        }
+    },
+    {
+        codigo: 'RF-05',
+        evaluar: async ({ aforoPrevio, aforoMaximoSede }) => {
+            if (aforoPrevio >= aforoMaximoSede) {
+                return 'Acceso denegado: La sucursal ha alcanzado su capacidad máxima de aforo.';
+            }
+            return null;
+        }
+    }
+];
+
+export class AccessService {
+    /**
+     * Inyección de Dependencias por Constructor (Unidad II y V):
+     * Permite inyectar dobles de prueba (Stubs/Mocks) para el repositorio, el reloj del sistema
+     * y las reglas de admisión en los tests unitarios sin mutar el estado global.
+     */
+    constructor(
+        repository = accessRepository,
+        clock = () => Date.now(),
+        reglasAdmision = REGLAS_ADMISION_INGRESO
+    ) {
+        this.repo = repository;
+        this.clock = clock;
+        this.reglasAdmision = reglasAdmision;
+    }
+
     /**
      * RF-04: Valida que el código QR tenga el formato FITZONE-<id>-<timestamp>
-     * y que no haya expirado (máximo 60 segundos de antigüedad).
+     * y que se encuentre dentro de la ventana de vigencia de 60 segundos.
      */
     validarFormatoYVigenciaQR(qrCode) {
         if (!qrCode || typeof qrCode !== 'string') {
@@ -16,7 +74,7 @@ class AccessService {
         }
 
         const partes = qrCode.trim().split('-');
-        if (partes.length < 3 || partes[0] !== 'FITZONE') {
+        if (partes.length < 3 || partes[0] !== 'FITZONE' || !partes[1]) {
             return { valido: false, mensaje: 'Formato de código QR no reconocido por FitZone.' };
         }
 
@@ -25,8 +83,8 @@ class AccessService {
             return { valido: false, mensaje: 'El código QR no contiene una marca de tiempo válida.' };
         }
 
-        const antiguedadMs = Date.now() - timestamp;
-        if (antiguedadMs > TIEMPO_EXPIRACION_QR_MS || antiguedadMs < -10000) {
+        const antiguedadMs = this.clock() - timestamp;
+        if (antiguedadMs > TIEMPO_EXPIRACION_QR_MS || antiguedadMs < TOLERANCIA_DESFASE_RELOJ_MS) {
             return { 
                 valido: false, 
                 mensaje: 'Código QR expirado. Por favor, utilice el código actual en su pantalla.' 
@@ -37,7 +95,32 @@ class AccessService {
     }
 
     /**
-     * Método maestro que decide si procesa un ingreso o una salida según el estado actual del socio.
+     * Obtiene el cupo máximo de la sede aplicando el valor por defecto en la capa de dominio.
+     */
+    async _obtenerCupoMaximoSede(sedeId) {
+        if (typeof this.repo.getCupoSede !== 'function') {
+            return AFORO_MAXIMO_DEFAULT;
+        }
+        const cupoBd = await this.repo.getCupoSede(sedeId);
+        return Number(cupoBd) > 0 ? Number(cupoBd) : AFORO_MAXIMO_DEFAULT;
+    }
+
+    /**
+     * Busca al socio a partir del QR validado (usa findUserByQR o findUserById según disponibilidad).
+     */
+    async _buscarSocioPorQR(qrCode, userId) {
+        if (typeof this.repo.findUserByQR === 'function') {
+            return await this.repo.findUserByQR(qrCode);
+        }
+        if (typeof this.repo.findUserById === 'function') {
+            return await this.repo.findUserById(Number(userId));
+        }
+        return null;
+    }
+
+    /**
+     * Método maestro (Molinete Inteligente):
+     * Valida el QR y consulta al socio una única vez, decidiendo si ejecuta ingreso o salida.
      */
     async procesarEscaneoMolinete(qrCode, sedeId) {
         try {
@@ -46,92 +129,86 @@ class AccessService {
                 return { autorizado: false, mensaje: validacionQR.mensaje };
             }
 
-            const usuario = await accessRepository.findUserByQR(qrCode);
+            const usuario = await this._buscarSocioPorQR(qrCode, validacionQR.userId);
             if (!usuario) {
                 return { autorizado: false, mensaje: 'Socio no encontrado o QR inválido.' };
             }
 
-            const estaAdentro = await accessRepository.checkAccesoActivoGlobal(usuario.id);
+            const estaAdentro = await this.repo.checkAccesoActivoGlobal(usuario.id);
 
             if (estaAdentro) {
-                const resultadoSalida = await this.procesarSalida(qrCode, sedeId);
-                if (resultadoSalida && resultadoSalida.autorizado) {
-                    resultadoSalida.tipoAccion = 'salida';
-                }
-                return resultadoSalida;
-            } else {
-                const resultadoIngreso = await this.procesarIngreso(qrCode, sedeId);
-                if (resultadoIngreso && resultadoIngreso.autorizado) {
-                    resultadoIngreso.tipoAccion = 'ingreso';
-                }
-                return resultadoIngreso;
+                return await this._ejecutarSalida(usuario, sedeId);
             }
+            return await this._ejecutarIngreso(usuario, sedeId, false);
         } catch (error) {
             console.error("Error crítico en procesarEscaneoMolinete:", error);
             return { autorizado: false, mensaje: "Error en el servidor." };
         }
     }
-    
-/**
+
+    /**
      * Procesa y valida el ingreso de un socio a la sucursal.
      */
     async procesarIngreso(qrCode, sedeId) {
         try {
             const validacionQR = this.validarFormatoYVigenciaQR(qrCode);
             if (!validacionQR.valido) {
-                throw new Error(validacionQR.mensaje);
+                return { autorizado: false, mensaje: validacionQR.mensaje };
             }
 
-            const usuario = await accessRepository.findUserByQR(qrCode);
+            const usuario = await this._buscarSocioPorQR(qrCode, validacionQR.userId);
             if (!usuario) {
-                throw new Error('Código QR inválido o socio inexistente.');
+                return { autorizado: false, mensaje: 'Código QR inválido o socio inexistente.' };
             }
 
-            const estadoMembresia = usuario.estado_suscripcion;
-            if (estadoMembresia !== 'activa' && estadoMembresia !== 'activo') {
-                throw new Error('Acceso denegado: El socio no posee una membresía activa.');
-            }
-
-            const accesoActivo = await accessRepository.checkAccesoActivoGlobal(usuario.id);
-            if (accesoActivo) {
-                throw new Error('Acceso denegado: El socio ya registra un ingreso activo en una sucursal (RN-01).');
-            }
-
-            // RF-05: Obtenemos el cupo real de la sede y validamos disponibilidad de aforo
-            const aforoMaximoSede = typeof accessRepository.getCupoSede === 'function'
-                ? await accessRepository.getCupoSede(sedeId)
-                : AFORO_MAXIMO_DEFAULT;
-
-            let aforoPrevio = 0;
-            if (typeof accessRepository.getAforoPorSede === 'function') {
-                aforoPrevio = await accessRepository.getAforoPorSede(sedeId);
-                if (aforoPrevio >= aforoMaximoSede) {
-                    throw new Error('Acceso denegado: La sucursal ha alcanzado su capacidad máxima de aforo.');
-                }
-            }
-
-            const registro = await accessRepository.createAccess({ idSede: sedeId, idUserId: usuario.id });
-
-            const aforoActual = typeof accessRepository.getAforoPorSede === 'function'
-                ? await accessRepository.getAforoPorSede(sedeId)
-                : aforoPrevio + 1;
-
-            return {
-                autorizado: true,
-                tipoAccion: 'ingreso',
-                mensaje: 'Ingreso exitoso',
-                usuarioId: usuario.id,
-                aforoActual: aforoActual,
-                aforoMaximo: aforoMaximoSede,
-                horaIngreso: registro.fecha_entrada
-            };
-
+            return await this._ejecutarIngreso(usuario, sedeId);
         } catch (error) {
-            return {
-                autorizado: false,
-                mensaje: error.message
-            };
+            return { autorizado: false, mensaje: error.message };
         }
+    }
+
+    /**
+     * Ejecuta el pipeline de reglas de admisión (RF-02, RN-01, RF-05) y persiste la entrada.
+     */
+    async _ejecutarIngreso(usuario, sedeId, estaAdentroPreviamente = undefined) {
+        const [aforoMaximoSede, aforoPrevio] = await Promise.all([
+            this._obtenerCupoMaximoSede(sedeId),
+            typeof this.repo.getAforoPorSede === 'function'
+                ? this.repo.getAforoPorSede(sedeId)
+                : Promise.resolve(0)
+        ]);
+
+        const contexto = {
+            usuario,
+            sedeId,
+            estaAdentroPreviamente,
+            aforoPrevio,
+            aforoMaximoSede,
+            repo: this.repo
+        };
+
+        for (const regla of this.reglasAdmision) {
+            const motivoRechazo = await regla.evaluar(contexto);
+            if (motivoRechazo) {
+                return { autorizado: false, mensaje: motivoRechazo };
+            }
+        }
+
+        const registro = await this.repo.createAccess({ idSede: sedeId, idUserId: usuario.id });
+
+        const aforoActual = typeof this.repo.getAforoPorSede === 'function'
+            ? await this.repo.getAforoPorSede(sedeId)
+            : aforoPrevio + 1;
+
+        return {
+            autorizado: true,
+            tipoAccion: 'ingreso',
+            mensaje: 'Ingreso exitoso',
+            usuarioId: usuario.id,
+            aforoActual,
+            aforoMaximo: aforoMaximoSede,
+            horaIngreso: registro.fecha_entrada
+        };
     }
 
     /**
@@ -144,38 +221,12 @@ class AccessService {
                 return { autorizado: false, mensaje: validacionQR.mensaje };
             }
 
-            const usuario = await accessRepository.findUserByQR(qrCode);
+            const usuario = await this._buscarSocioPorQR(qrCode, validacionQR.userId);
             if (!usuario) {
                 return { autorizado: false, mensaje: 'Código QR inválido.' };
             }
 
-            const salida = await accessRepository.registrarSalida(usuario.id, sedeId);
-
-            if (!salida) {
-                return {
-                    autorizado: false,
-                    mensaje: "El socio tiene un ingreso activo en otra sucursal distinta a esta."
-                };
-            }
-
-            let aforoActual = 0;
-            if (typeof accessRepository.getAforoPorSede === 'function') {
-                aforoActual = await accessRepository.getAforoPorSede(sedeId);
-            }
-
-            const aforoMaximoSede = typeof accessRepository.getCupoSede === 'function'
-                ? await accessRepository.getCupoSede(sedeId)
-                : AFORO_MAXIMO_DEFAULT;
-
-            return {
-                autorizado: true,
-                tipoAccion: 'salida',
-                mensaje: "Salida registrada correctamente.",
-                usuarioId: usuario.id,
-                aforoActual: aforoActual,
-                aforoMaximo: aforoMaximoSede,
-                data: salida
-            };
+            return await this._ejecutarSalida(usuario, sedeId);
         } catch (error) {
             console.error("Error en procesarSalida:", error);
             return {
@@ -184,7 +235,39 @@ class AccessService {
             };
         }
     }
-   /**
+
+    /**
+     * Ejecuta el cierre de permanencia en la sede actual y libera aforo.
+     */
+    async _ejecutarSalida(usuario, sedeId) {
+        const salida = await this.repo.registrarSalida(usuario.id, sedeId);
+
+        if (!salida) {
+            return {
+                autorizado: false,
+                mensaje: "El socio tiene un ingreso activo en otra sucursal distinta a esta."
+            };
+        }
+
+        const [aforoActual, aforoMaximoSede] = await Promise.all([
+            typeof this.repo.getAforoPorSede === 'function'
+                ? this.repo.getAforoPorSede(sedeId)
+                : Promise.resolve(0),
+            this._obtenerCupoMaximoSede(sedeId)
+        ]);
+
+        return {
+            autorizado: true,
+            tipoAccion: 'salida',
+            mensaje: "Salida registrada correctamente.",
+            usuarioId: usuario.id,
+            aforoActual,
+            aforoMaximo: aforoMaximoSede,
+            data: salida
+        };
+    }
+
+    /**
      * Registra el acceso en puerta de un Cliente Externo (id_rol = 2):
      * - Si el DNI pertenece a un Socio (id_rol = 3) o Personal (1, 4), bloquea la carga manual y exige QR.
      * - Si el DNI ya existe como Cliente Externo (id_rol = 2), reutiliza su cuenta existente sin duplicarla.
@@ -201,12 +284,10 @@ class AccessService {
         }
 
         let usuarioBd = null;
-        if (typeof accessRepository.findUserByDni === 'function') {
-            usuarioBd = await accessRepository.findUserByDni(dniLimpio);
+        if (typeof this.repo.findUserByDni === 'function') {
+            usuarioBd = await this.repo.findUserByDni(dniLimpio);
         }
 
-        const ROL_CLIENTE_EXTERNO = 2;
-        const ROL_SOCIO = 3;
         let yaEstabaRegistrado = false;
 
         if (usuarioBd) {
@@ -234,16 +315,17 @@ class AccessService {
             yaEstabaRegistrado = true;
         } else {
             // 4. Si no existe en la BD, lo creamos como Cliente Externo (id_rol = 2)
-            if (typeof accessRepository.createUserPublic === 'function') {
-                usuarioBd = await accessRepository.createUserPublic({
+            if (typeof this.repo.createUserPublic === 'function') {
+                usuarioBd = await this.repo.createUserPublic({
                     nombre: nombreLimpio,
                     dni: dniLimpio,
-                    id_rol: ROL_CLIENTE_EXTERNO
+                    id_rol: ROL_CLIENTE_EXTERNO,
+                    contacto: `externo.${dniLimpio}@fitzone.com`
                 });
             }
         }
 
-        const registro = await accessRepository.createAccess({ 
+        const registro = await this.repo.createAccess({ 
             idSede: sedeId, 
             idUserId: usuarioBd.id 
         });
@@ -264,52 +346,42 @@ class AccessService {
             acceso: registro
         };
     }
-/**
+
+    /**
      * Obtiene el aforo actual, el aforo máximo real (cupo) y los últimos movimientos de una sede.
      */
     async obtenerEstadoSede(sedeId) {
-        try {
-            const [aforoActual, aforoMaximo, ultimosMovimientos] = await Promise.all([
-                accessRepository.getAforoPorSede(sedeId),
-                typeof accessRepository.getCupoSede === 'function'
-                    ? accessRepository.getCupoSede(sedeId)
-                    : Promise.resolve(AFORO_MAXIMO_DEFAULT),
-                accessRepository.getUltimosMovimientosPorSede(sedeId)
-            ]);
-            return { 
-                aforoActual, 
-                aforoMaximo, 
-                ultimosMovimientos 
-            };
-        } catch (error) {
-            console.error("Error en obtenerEstadoSede (Servicio):", error);
-            throw error;
-        }
+        const [aforoActual, aforoMaximo, ultimosMovimientos] = await Promise.all([
+            this.repo.getAforoPorSede(sedeId),
+            this._obtenerCupoMaximoSede(sedeId),
+            this.repo.getUltimosMovimientosPorSede(sedeId)
+        ]);
+        return { 
+            aforoActual, 
+            aforoMaximo, 
+            ultimosMovimientos 
+        };
     }
+
     /**
      * Obtiene el historial de accesos de un usuario específico.
      */
     async obtenerHistorialSocio(userId) {
-        try {
-            return await accessRepository.getHistorialByUser(userId);
-        } catch (error) {
-            console.error("Error en obtenerHistorialSocio (Servicio):", error);
-            throw error;
-        }
+        return await this.repo.getHistorialByUser(userId);
     }
 
     /**
      * RNF-01: Obtiene el padrón de socios para la réplica local del terminal de sede.
      */
     async obtenerPadronOffline() {
-        const socios = await accessRepository.getPadronOffline();
+        const socios = await this.repo.getPadronOffline();
         return {
-            fechaSincronizacion: new Date().toISOString(),
+            fechaSincronizacion: new Date(this.clock()).toISOString(),
             socios: Array.isArray(socios) ? socios : []
         };
     }
 
-   /**
+    /**
      * RNF-01 / ADR-007: Sincroniza en lote los accesos registrados en modo offline
      * garantizando idempotencia y cumplimiento de RN-01.
      */
@@ -323,10 +395,9 @@ class AccessService {
         for (const ev of eventosOrdenados) {
             try {
                 if (ev.tipoAccion === 'ingreso') {
-                    // Evita duplicar el ingreso si el socio ya figura adentro (Idempotencia / RN-01)
-                    const yaEstaAdentro = await accessRepository.checkAccesoActivoGlobal(ev.usuarioId);
+                    const yaEstaAdentro = await this.repo.checkAccesoActivoGlobal(ev.usuarioId);
                     if (!yaEstaAdentro) {
-                        await accessRepository.createAccess({
+                        await this.repo.createAccess({
                             idSede: ev.sedeId,
                             idUserId: ev.usuarioId,
                             fechaEntrada: new Date(ev.fechaEvento)
@@ -334,11 +405,9 @@ class AccessService {
                         resultados.procesados++;
                     }
                 } else if (ev.tipoAccion === 'salida') {
-                    const salida = await accessRepository.registrarSalida(
-                        ev.usuarioId,
-                        ev.sedeId,
-                        ev.fechaEvento
-                    );
+                    const salida = await accessRepository.registrarSalida
+                        ? await this.repo.registrarSalida(ev.usuarioId, ev.sedeId, ev.fechaEvento)
+                        : null;
                     if (salida) resultados.procesados++;
                 }
             } catch (err) {

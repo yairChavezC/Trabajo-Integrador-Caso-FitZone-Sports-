@@ -1,38 +1,47 @@
 import pool from '../../../config/db.js';
 
+const ROL_CLIENTE_EXTERNO = 2;
+
 /**
- * Busca un usuario a partir de su código QR y normaliza el estado de su suscripción.
+ * Busca un usuario por su ID primario y obtiene el estado de su suscripción más reciente.
  */
-const findUserByQR = async (qrCode) => {
+const findUserById = async (userId) => {
     try {
-        const partes = qrCode.split('-');
-        if (partes.length < 2 || partes[0] !== 'FITZONE') {
-            return null;
-        }
-        
-        const userId = partes[1];
-        
         const query = `
             SELECT u.*, LOWER(TRIM(s.estado)) AS estado_suscripcion 
             FROM usuario u 
             LEFT JOIN suscripcion s ON u.id = s.id_usuario 
             WHERE u.id = $1
+            ORDER BY s.id DESC
+            LIMIT 1;
         `;
         const result = await pool.query(query, [userId]);
-        return result.rows[0];
+        return result.rows[0] || null;
     } catch (error) {
-        console.error("Error al buscar usuario por QR:", error);
+        console.error("Error al buscar usuario por ID:", error);
         return null;
     }
 };
 
 /**
- * RN-01: Verifica si el usuario ya se encuentra dentro de alguna sede.
+ * Mantiene compatibilidad si se invoca pasando un userId o un token QR.
+ */
+const findUserByQR = async (qrOrUserId) => {
+    if (qrOrUserId === null || qrOrUserId === undefined) return null;
+    const raw = String(qrOrUserId).trim();
+    const userId = raw.includes('-') ? raw.split('-')[1] : raw;
+    if (!userId || isNaN(Number(userId))) return null;
+    return findUserById(Number(userId));
+};
+
+/**
+ * RN-01: Verifica si el usuario ya se encuentra dentro de alguna sede (fecha_salida IS NULL).
  */
 const checkAccesoActivoGlobal = async (idUserId) => {
     const query = `
-        SELECT id FROM control_acceso 
-        WHERE id_usuario = $1 AND fecha_salida IS NULL;
+        SELECT id, id_sede FROM control_acceso 
+        WHERE id_usuario = $1 AND fecha_salida IS NULL
+        LIMIT 1;
     `;
     const result = await pool.query(query, [idUserId]);
     return result.rows.length > 0;
@@ -54,7 +63,7 @@ const createAccess = async (accessData) => {
 };
 
 /**
- * Registra la salida de un usuario de una sede.
+ * Registra la salida de un usuario en una sede específica.
  */
 const registrarSalida = async (idUserId, idSede, fechaSalida = null) => {
     const query = `
@@ -65,24 +74,23 @@ const registrarSalida = async (idUserId, idSede, fechaSalida = null) => {
     `;
     const values = [fechaSalida ? new Date(fechaSalida) : new Date(), idUserId, idSede];
     const result = await pool.query(query, values);
-    return result.rows[0]; 
+    return result.rows[0] || null; 
 };
 
 /**
  * RF-05: Obtiene el aforo actual de una sede específica.
- * REGLA: Los clientes externos (id_rol = 2) NO suman al aforo.
+ * Los clientes externos (id_rol = 2) no consumen cupo de gimnasio de socios.
  */
 const getAforoPorSede = async (idSede) => {
     const query = `
-        SELECT COUNT(*) as personas_adentro 
+        SELECT COUNT(*) AS personas_adentro 
         FROM control_acceso ca
         JOIN usuario u ON ca.id_usuario = u.id
         WHERE ca.id_sede = $1 
           AND ca.fecha_salida IS NULL
-          AND u.id_rol != 2;
+          AND u.id_rol != $2;
     `;
-    const values = [idSede];
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, [idSede, ROL_CLIENTE_EXTERNO]);
     return parseInt(result.rows[0].personas_adentro, 10);
 };
 
@@ -104,7 +112,6 @@ const getUltimosMovimientosPorSede = async (idSede, limite = 5) => {
             ORDER BY COALESCE(ca.fecha_salida, ca.fecha_entrada) DESC
             LIMIT $2;
         `;
-        
         const result = await pool.query(query, [idSede, limite]);
         return result.rows;
     } catch (error) {
@@ -114,8 +121,7 @@ const getUltimosMovimientosPorSede = async (idSede, limite = 5) => {
 };
 
 /**
- * Busca un usuario por DNI (ignorando espacios laterales) para validar si ya existe
- * como socio o como cliente externo registrado.
+ * Busca un usuario por DNI (ignorando espacios laterales) para validar si ya existe.
  */
 const findUserByDni = async (dni) => {
     try {
@@ -137,14 +143,13 @@ const findUserByDni = async (dni) => {
 };
 
 /**
- * Crea el perfil del cliente externo (id_rol = 2) en la tabla usuario cuando no estaba registrado.
- * Se asigna su DNI hasheado como contraseña inicial para cumplir la restricción NOT NULL de la BD.
+ * Crea el perfil del cliente externo en la tabla usuario cumpliendo las restricciones NOT NULL y UNIQUE.
  */
 const createUserPublic = async (userData) => {
-    const { nombre, dni, id_rol } = userData;
+    const { nombre, dni, id_rol, contacto } = userData;
     const dniLimpio = String(dni).trim();
     const nombreLimpio = String(nombre).trim();
-    const contactoGenerado = `externo.${dniLimpio}@fitzone.com`;
+    const contactoFinal = contacto || `externo.${dniLimpio}@fitzone.com`;
 
     try {
         const query = `
@@ -152,7 +157,7 @@ const createUserPublic = async (userData) => {
             VALUES ($1, $2, $3, encode(digest($4, 'sha256'), 'hex'), $5, true)
             RETURNING id, nombre, dni, contacto, id_rol, activo;
         `;
-        const values = [nombreLimpio, dniLimpio, contactoGenerado, dniLimpio, id_rol || 2]; 
+        const values = [nombreLimpio, dniLimpio, contactoFinal, dniLimpio, id_rol || ROL_CLIENTE_EXTERNO]; 
         const result = await pool.query(query, values);
         return result.rows[0];
     } catch (error) {
@@ -171,7 +176,7 @@ const getHistorialByUser = async (userId) => {
                 ca.id, 
                 ca.fecha_entrada, 
                 ca.fecha_salida,
-                s.nombre as sede_nombre
+                s.nombre AS sede_nombre
             FROM control_acceso ca
             LEFT JOIN sede s ON ca.id_sede = s.id
             WHERE ca.id_usuario = $1
@@ -236,22 +241,24 @@ const getPadronOffline = async () => {
         throw error;
     }
 };
+
 /**
- * RF-05: Obtiene la capacidad máxima (cupo) configurada para una sede específica.
+ * RF-05: Obtiene el valor crudo de capacidad máxima (cupo) configurado para una sede en la BD.
  */
 const getCupoSede = async (idSede) => {
     try {
         const query = `SELECT cupo FROM sede WHERE id = $1 LIMIT 1;`;
         const result = await pool.query(query, [idSede]);
         const cupo = Number(result.rows[0]?.cupo);
-        return cupo > 0 ? cupo : 100;
+        return cupo > 0 ? cupo : null;
     } catch (error) {
         console.error("Error al obtener cupo de la sede:", error);
-        return 100;
+        return null;
     }
 };
 
 export default {
+    findUserById,
     findUserByQR,
     checkAccesoActivoGlobal,
     createAccess,

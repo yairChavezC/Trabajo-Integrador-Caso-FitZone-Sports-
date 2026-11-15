@@ -1,4 +1,4 @@
-import { ValidateAccessDTO } from '../dtos/access.dto.js';
+import { ValidateAccessDTO, CreateExternalAccessDTO } from '../dtos/access.dto.js';
 import accessService from '../services/accessService.js';
 
 class AccessController {
@@ -7,10 +7,14 @@ class AccessController {
         try {
             const dto = new ValidateAccessDTO(req.body);
             const erroresValidacion = dto.validate();
-            if (erroresValidacion.length > 0) return res.status(400).json({ success: false, errores: erroresValidacion });
+            if (erroresValidacion.length > 0) {
+                return res.status(400).json({ success: false, mensaje: erroresValidacion[0], errores: erroresValidacion });
+            }
             
             const resultado = await accessService.procesarEscaneoMolinete(dto.qrCode, dto.sedeId);
-            if (!resultado.autorizado) return res.status(400).json({ success: false, mensaje: resultado.mensaje });
+            if (!resultado.autorizado) {
+                return res.status(400).json({ success: false, mensaje: resultado.mensaje });
+            }
             return res.status(200).json({ success: true, data: resultado });
         } catch (error) {
             return res.status(500).json({ success: false, mensaje: 'Error interno del servidor al procesar el escaneo.' });
@@ -21,10 +25,14 @@ class AccessController {
         try {
             const dto = new ValidateAccessDTO(req.body);
             const erroresValidacion = dto.validate();
-            if (erroresValidacion.length > 0) return res.status(400).json({ success: false, errores: erroresValidacion });
+            if (erroresValidacion.length > 0) {
+                return res.status(400).json({ success: false, mensaje: erroresValidacion[0], errores: erroresValidacion });
+            }
 
             const resultado = await accessService.procesarIngreso(dto.qrCode, dto.sedeId);
-            if (!resultado.autorizado) return res.status(400).json({ success: false, mensaje: resultado.mensaje });
+            if (!resultado.autorizado) {
+                return res.status(400).json({ success: false, mensaje: resultado.mensaje });
+            }
             return res.status(200).json({ success: true, data: resultado });
         } catch (error) {
             return res.status(500).json({ success: false, mensaje: 'Error interno del servidor al procesar el ingreso.' });
@@ -33,11 +41,16 @@ class AccessController {
 
     async registrarSalida(req, res) {
         try {
-            const { qrCode, sedeId } = req.body;
-            if (!qrCode || !sedeId) return res.status(400).json({ success: false, mensaje: 'Faltan datos obligatorios para registrar la salida.' });
+            const dto = new ValidateAccessDTO(req.body);
+            const erroresValidacion = dto.validate();
+            if (erroresValidacion.length > 0) {
+                return res.status(400).json({ success: false, mensaje: 'Faltan datos obligatorios para registrar la salida.', errores: erroresValidacion });
+            }
 
-            const resultado = await accessService.procesarSalida(qrCode, sedeId);
-            if (!resultado.autorizado) return res.status(400).json({ success: false, mensaje: resultado.mensaje });
+            const resultado = await accessService.procesarSalida(dto.qrCode, dto.sedeId);
+            if (!resultado.autorizado) {
+                return res.status(400).json({ success: false, mensaje: resultado.mensaje });
+            }
             return res.status(200).json({ success: true, data: resultado });
         } catch (error) {
             return res.status(500).json({ success: false, mensaje: 'Error interno del servidor al procesar la salida.' });
@@ -56,11 +69,21 @@ class AccessController {
 
     async registrarExterno(req, res) {
         try {
-            const { nombre, dni, sedeId } = req.body;
-            if (!nombre || !dni || !sedeId) {
-                return res.status(400).json({ success: false, mensaje: 'Nombre, DNI y Sede son campos obligatorios.' });
+            const dto = new CreateExternalAccessDTO(req.body);
+            const erroresValidacion = dto.validate();
+            if (erroresValidacion.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    mensaje: erroresValidacion[0],
+                    errores: erroresValidacion
+                });
             }
-            const resultado = await accessService.registrarIngresoExterno({ nombre, dni, sedeId });
+
+            const resultado = await accessService.registrarIngresoExterno({
+                nombre: dto.nombre,
+                dni: dto.dni,
+                sedeId: dto.sedeId
+            });
             return res.status(201).json({ success: true, data: resultado });
         } catch (error) {
             const status = error.statusCode || 500;
@@ -74,19 +97,13 @@ class AccessController {
     async obtenerHistorialSocio(req, res) {
         try {
             const userId = req.usuario?.id; 
-
             if (!userId) {
                 return res.status(401).json({ success: false, mensaje: "Usuario no autenticado." });
             }
 
             const historial = await accessService.obtenerHistorialSocio(userId);
-
-            return res.status(200).json({
-                success: true,
-                data: historial
-            });
+            return res.status(200).json({ success: true, data: historial });
         } catch (error) {
-            console.error("Error al obtener historial del socio:", error);
             return res.status(500).json({ success: false, mensaje: "Error del servidor" });
         }
     }
