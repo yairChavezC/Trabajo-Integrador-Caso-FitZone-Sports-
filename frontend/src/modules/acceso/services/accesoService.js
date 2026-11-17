@@ -278,8 +278,10 @@ export const accesoService = {
     obtenerMisReservasCanchas: async () => {
         try {
             const response = await httpClient.get('/reservas-canchas/mis-reservas');
-            const data = response?.data?.data || response?.data || [];
-            return Array.isArray(data) ? data.slice(0, 5) : [];
+            const lista = Array.isArray(response)
+                ? response
+                : response?.data?.data || response?.data || [];
+            return Array.isArray(lista) ? lista.slice(0, 5) : [];
         } catch (error) {
             return [];
         }
@@ -287,9 +289,44 @@ export const accesoService = {
 
     obtenerMisInscripcionesClases: async () => {
         try {
-            const response = await httpClient.get('/clases/mis-inscripciones');
-            const data = response?.data?.data || response?.data || [];
-            return Array.isArray(data) ? data.slice(0, 5) : [];
+            const [resInscripciones, resClases] = await Promise.all([
+                httpClient.get('/clases/mis-inscripciones').catch(() => []),
+                httpClient.get('/clases').catch(() => [])
+            ]);
+
+            // El módulo de clases devuelve el Array directo en la raíz de la respuesta
+            const listaDirecta = Array.isArray(resInscripciones)
+                ? resInscripciones
+                : resInscripciones?.data?.data || resInscripciones?.data || [];
+
+            const catalogoClases = Array.isArray(resClases)
+                ? resClases
+                : resClases?.data?.data || resClases?.data || [];
+
+            const desdeCatalogo = Array.isArray(catalogoClases)
+                ? catalogoClases
+                    .filter((c) => Boolean(c.miInscripcion))
+                    .map((c) => ({
+                        idInscripcion: c.miInscripcion.id,
+                        idClase: c.id,
+                        nombreClase: c.nombre,
+                        instructor: c.profesor,
+                        sede: c.sede,
+                        fechaInicio: c.fechaInicio,
+                        fechaFin: c.fechaFin,
+                        estado: c.miInscripcion.estado
+                    }))
+                : [];
+
+            const mapaUnificado = new Map();
+            [...listaDirecta, ...desdeCatalogo].forEach((item) => {
+                const key = item.idClase || item.idInscripcion || item.id;
+                if (key && !mapaUnificado.has(key)) {
+                    mapaUnificado.set(key, item);
+                }
+            });
+
+            return Array.from(mapaUnificado.values()).slice(0, 5);
         } catch (error) {
             return [];
         }

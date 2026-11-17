@@ -489,37 +489,67 @@
 
 /* Página: SocioDashboard */
 .socio-dashboard-container {
-  padding: 2rem 3rem;
+  padding: 1.5rem 2.5rem;
+  max-width: 1280px;
+  margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
   font-family: system-ui, -apple-system, sans-serif;
 }
 
 .socio-dashboard-header {
-  margin-bottom: 2rem;
-  border-bottom: 2px solid var(--color-border-divider);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border-subtle);
   padding-bottom: 1rem;
-  width: 100%;
 }
 
-.socio-dashboard-meta {
-  color: var(--color-text-label);
+.socio-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-heading);
+}
+
+.socio-user-dni {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--color-border-subtle);
 }
 
 .socio-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
   width: 100%;
-  align-items: start;
+  align-items: stretch;
+}
+
+@media (max-width: 960px) {
+  .socio-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .socio-section-card {
   background-color: var(--color-surface-card);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-subtle);
   box-shadow: var(--shadow-card);
-  padding: 1.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   box-sizing: border-box;
 }
@@ -529,27 +559,41 @@
 }
 
 .socio-section-header {
-  margin-bottom: 1rem;
-  border-bottom: 1px solid var(--color-border-divider);
-  padding-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1.25rem;
+  background-color: var(--color-surface-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .socio-section-title {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   color: var(--color-text-heading);
   margin: 0;
   font-weight: 600;
 }
 
-.socio-section-subtitle {
-  font-size: 0.8rem;
+.socio-section-count {
+  font-size: 0.75rem;
   color: var(--color-text-muted);
-  margin: 0.2rem 0 0 0;
+  font-weight: 500;
 }
 
 .socio-table-wrapper {
   overflow-x: auto;
   width: 100%;
+}
+
+.socio-section-card .acceso-history-table th,
+.socio-section-card .acceso-history-table td {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+}
+
+.socio-section-card .acceso-history-empty {
+  padding: 2rem 1.25rem;
+  font-size: 0.9rem;
 }
 
 /* Página: CredencialScreen (QR Dinámico) */
