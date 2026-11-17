@@ -4,10 +4,9 @@ import { NavLink } from 'react-router-dom';
 import { getRolClases } from '../../../modules/clases/services/claseService';
 
 const RUTAS_NAVEGACION = [
-  { path: '/canchas', etiqueta: 'Canchas' },
   { path: '/acceso', etiqueta: 'Acceso' },
+  { path: '/canchas', etiqueta: 'Canchas' },
   { path: '/clases', etiqueta: 'Clases' },
-  { path: '/pagos', etiqueta: 'Pagos' },
   { path: '/socios', etiqueta: 'Socios' }
 ];
 
