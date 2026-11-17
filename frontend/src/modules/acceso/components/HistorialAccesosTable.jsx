@@ -1,11 +1,47 @@
 import React from 'react';
 
-export const HistorialAccesosTable = ({ historial = [] }) => {
+const normalizarFilaMovimiento = (mov) => {
+  // 1. Si ya viene mapeado desde el Panel de Recepción ({ id, hora, evento, estado })
+  if (mov.hora && mov.evento && mov.estado) {
+    return mov;
+  }
+
+  // 2. Si viene crudo desde /api/accesses/me/historial ({ id, fecha_entrada, fecha_salida, sede })
+  const tieneSalida = mov.fecha_salida !== null && mov.fecha_salida !== undefined;
+  const fechaEntradaObj = mov.fecha_entrada ? new Date(mov.fecha_entrada) : null;
+  const fechaSalidaObj = tieneSalida ? new Date(mov.fecha_salida) : null;
+
+  const fechaTexto = fechaEntradaObj && !isNaN(fechaEntradaObj)
+    ? fechaEntradaObj.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+    : '--:--';
+
+  const horaSalidaTexto = fechaSalidaObj && !isNaN(fechaSalidaObj)
+    ? fechaSalidaObj.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const nombreSede = mov.sede?.nombre || mov.sede_nombre || 'Sede FitZone';
+  const eventoTexto = tieneSalida
+    ? `${nombreSede} (Salida: ${horaSalidaTexto})`
+    : `${nombreSede} (En permanencia)`;
+
+  return {
+    id: mov.id || Math.random(),
+    hora: fechaTexto,
+    evento: eventoTexto,
+    estado: tieneSalida ? 'Finalizado' : 'Autorizado'
+  };
+};
+
+export const HistorialAccesosTable = ({ historial = [], loading = false }) => {
   const obtenerClaseBadge = (estado) => {
     if (estado === 'Autorizado') return 'acceso-badge acceso-badge--success';
     if (estado === 'Finalizado') return 'acceso-badge acceso-badge--info';
     return 'acceso-badge acceso-badge--danger';
   };
+
+  const filasNormalizadas = Array.isArray(historial)
+    ? historial.map(normalizarFilaMovimiento)
+    : [];
 
   return (
     <section className="acceso-history-card">
@@ -13,21 +49,25 @@ export const HistorialAccesosTable = ({ historial = [] }) => {
         <h3 className="acceso-history-title">Últimos Movimientos en Puerta</h3>
       </div>
 
-      {historial.length === 0 ? (
+      {loading ? (
         <div className="acceso-history-empty">
-          No hay ingresos recientes registrados en esta sucursal.
+          Cargando historial de accesos...
+        </div>
+      ) : filasNormalizadas.length === 0 ? (
+        <div className="acceso-history-empty">
+          No hay ingresos recientes registrados.
         </div>
       ) : (
         <table className="acceso-history-table">
           <thead>
             <tr>
-              <th>Hora</th>
-              <th>Evento</th>
+              <th>Fecha / Hora</th>
+              <th>Detalle del Movimiento</th>
               <th className="acceso-text-right">Estado</th>
             </tr>
           </thead>
           <tbody>
-            {historial.map((mov) => (
+            {filasNormalizadas.map((mov) => (
               <tr key={mov.id}>
                 <td className="acceso-history-time">{mov.hora}</td>
                 <td className="acceso-history-event">{mov.evento}</td>

@@ -3,12 +3,22 @@ import pool from '../../../config/db.js';
 const ROL_CLIENTE_EXTERNO = 2;
 
 /**
- * Busca un usuario por su ID primario y obtiene el estado de su suscripción más reciente.
+ * Busca un usuario por su ID primario y calcula el estado real de su suscripción
+ * considerando tanto s.estado como s.fecha_proximo_vencimiento y u.activo (RF-02 / RN-03).
  */
 const findUserById = async (userId) => {
     try {
         const query = `
-            SELECT u.*, LOWER(TRIM(s.estado)) AS estado_suscripcion 
+            SELECT 
+                u.*,
+                s.fecha_proximo_vencimiento,
+                CASE
+                    WHEN u.activo = false THEN 'suspendida'
+                    WHEN s.id IS NULL THEN 'inactiva'
+                    WHEN s.fecha_proximo_vencimiento IS NOT NULL AND s.fecha_proximo_vencimiento < CURRENT_DATE THEN 'vencida'
+                    WHEN s.fecha_fin IS NOT NULL AND s.fecha_fin < CURRENT_DATE THEN 'vencida'
+                    ELSE LOWER(TRIM(s.estado))
+                END AS estado_suscripcion
             FROM usuario u 
             LEFT JOIN suscripcion s ON u.id = s.id_usuario 
             WHERE u.id = $1
@@ -127,7 +137,15 @@ const findUserByDni = async (dni) => {
     try {
         const dniLimpio = String(dni || '').trim();
         const query = `
-            SELECT u.*, LOWER(TRIM(s.estado)) AS estado_suscripcion
+            SELECT 
+                u.*,
+                s.fecha_proximo_vencimiento,
+                CASE
+                    WHEN u.activo = false THEN 'suspendida'
+                    WHEN s.id IS NULL THEN 'inactiva'
+                    WHEN s.fecha_proximo_vencimiento IS NOT NULL AND s.fecha_proximo_vencimiento < CURRENT_DATE THEN 'vencida'
+                    ELSE LOWER(TRIM(s.estado))
+                END AS estado_suscripcion
             FROM usuario u
             LEFT JOIN suscripcion s ON u.id = s.id_usuario
             WHERE TRIM(u.dni) = $1
@@ -198,8 +216,8 @@ const getHistorialByUser = async (userId) => {
 };
 
 /**
- * RNF-01: Obtiene el padrón resumido de usuarios y su estado de membresía/presencia actual
- * para ser replicado localmente en la terminal de cada sede (contingencia offline).
+ * RNF-01: Obtiene el padrón resumido de usuarios y su estado real de membresía/presencia
+ * considerando fecha_proximo_vencimiento para la réplica local offline.
  */
 const getPadronOffline = async () => {
     try {
@@ -210,7 +228,13 @@ const getPadronOffline = async () => {
                 u.nombre, 
                 u.id_rol,
                 COALESCE(
-                    (SELECT s.estado 
+                    (SELECT 
+                        CASE
+                            WHEN u.activo = false THEN 'suspendida'
+                            WHEN s.fecha_proximo_vencimiento IS NOT NULL AND s.fecha_proximo_vencimiento < CURRENT_DATE THEN 'vencida'
+                            WHEN s.fecha_fin IS NOT NULL AND s.fecha_fin < CURRENT_DATE THEN 'vencida'
+                            ELSE LOWER(TRIM(s.estado))
+                        END
                      FROM suscripcion s 
                      WHERE s.id_usuario = u.id 
                      ORDER BY s.id DESC 

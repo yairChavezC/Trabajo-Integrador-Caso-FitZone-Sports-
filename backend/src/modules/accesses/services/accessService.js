@@ -16,11 +16,25 @@ const ROL_SOCIO = 3;
 const REGLAS_ADMISION_INGRESO = [
     {
         codigo: 'RF-02',
-        evaluar: async ({ usuario }) => {
+        evaluar: async ({ usuario, clock }) => {
+            if (usuario.activo === false) {
+                return 'Acceso denegado: El socio se encuentra suspendido o inactivo.';
+            }
+
             const estado = (usuario.estado_suscripcion || '').toLowerCase().trim();
             if (estado !== 'activa' && estado !== 'activo') {
                 return 'Acceso denegado: El socio no posee una membresía activa.';
             }
+
+            if (usuario.fecha_proximo_vencimiento) {
+                const vencimiento = new Date(usuario.fecha_proximo_vencimiento);
+                vencimiento.setHours(23, 59, 59, 999);
+                const ahora = typeof clock === 'function' ? clock() : Date.now();
+                if (!isNaN(vencimiento.getTime()) && vencimiento.getTime() < ahora) {
+                    return 'Acceso denegado: El socio no posee una membresía activa (cuota vencida).';
+                }
+            }
+
             return null;
         }
     },
@@ -184,7 +198,8 @@ export class AccessService {
             estaAdentroPreviamente,
             aforoPrevio,
             aforoMaximoSede,
-            repo: this.repo
+            repo: this.repo,
+            clock: this.clock
         };
 
         for (const regla of this.reglasAdmision) {
