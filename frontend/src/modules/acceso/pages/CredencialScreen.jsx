@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useAuth } from '../../../core/auth/AuthContext';
+import { accesoService } from '../services/accesoService';
 import './AccesoScreen.css';
 
 export const CredencialScreen = () => {
     const [qrCodeData, setQrCodeData] = useState('');
     const [timeLeft, setTimeLeft] = useState(60);
-    const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+    const { usuario: usuarioContext } = useAuth();
+    const usuario = usuarioContext || accesoService.obtenerUsuarioActual();
 
     const generarNuevoCodigo = () => {
-        const nuevoCodigo = `FITZONE-${usuario.id || 'DEMO'}-${Date.now()}`;
+        const nuevoCodigo = `FITZONE-${usuario?.id || 'DEMO'}-${Date.now()}`;
         setQrCodeData(nuevoCodigo);
         setTimeLeft(60);
     };

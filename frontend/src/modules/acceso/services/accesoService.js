@@ -3,6 +3,7 @@ import { httpClient } from '../../../core/api/httpClient.js';
 const STORAGE_PADRON_KEY = 'fitzone_padron_offline';
 const STORAGE_COLA_KEY = 'fitzone_cola_accesos_offline';
 const STORAGE_SEDES_KEY = 'fitzone_sedes_offline';
+const STORAGE_USUARIO_KEY = 'usuario';
 const STORAGE_ESTADO_SEDE_PREFIX = 'fitzone_estado_sede_';
 const TIEMPO_EXPIRACION_QR_MS = 65 * 1000;
 const TOLERANCIA_DESFASE_MS = -10 * 1000;
@@ -42,6 +43,9 @@ const offlineStorageAdapter = {
         const sedes = JSON.parse(localStorage.getItem(STORAGE_SEDES_KEY) || '[]');
         const sede = sedes.find(s => Number(s.id) === Number(sedeId));
         return Number(sede?.cupo) || Number(fallback) || 100;
+    },
+    obtenerUsuarioSesion() {
+        return JSON.parse(localStorage.getItem(STORAGE_USUARIO_KEY) || '{}');
     }
 };
 
@@ -76,6 +80,10 @@ const parsearYValidarQR = (qrCode) => {
 };
 
 export const accesoService = {
+    obtenerUsuarioActual: () => {
+        return offlineStorageAdapter.obtenerUsuarioSesion();
+    },
+
     /**
      * Descarga y guarda en localStorage el padrón de socios para contingencia offline (RNF-01).
      */
@@ -113,7 +121,6 @@ export const accesoService = {
 
         const sedeIdNorm = Number(sedeId) || 1;
 
-        // RN-01: Si el socio está adentro, verificamos que sea en ESTA misma sede
         if (socio.esta_adentro && socio.id_sede_activa && Number(socio.id_sede_activa) !== sedeIdNorm) {
             throw new Error('Acceso denegado: El socio ya registra un ingreso activo en otra sucursal (RN-01).');
         }
@@ -125,17 +132,14 @@ export const accesoService = {
         const cupoMaximoSede = offlineStorageAdapter.obtenerCupoCatalogoSede(sedeIdNorm, estadoSedeLocal.aforoMaximo);
         const aforoPrevio = Number(estadoSedeLocal.aforoActual) || 0;
 
-        // RF-05: Si es un ingreso de socio, verificamos que no supere el cupo máximo de la sucursal
         if (tipoAccion === 'ingreso' && Number(socio.id_rol) !== ROL_CLIENTE_EXTERNO && aforoPrevio >= cupoMaximoSede) {
             throw new Error('Acceso denegado: La sucursal ha alcanzado su capacidad máxima de aforo.');
         }
 
-        // 1. Invertimos presencia y sede activa en el padrón local
         padronData.socios[socioIndex].esta_adentro = !socio.esta_adentro;
         padronData.socios[socioIndex].id_sede_activa = tipoAccion === 'ingreso' ? sedeIdNorm : null;
         offlineStorageAdapter.guardarPadron(padronData);
 
-        // 2. Encolamos el evento para sincronización diferida (ADR-007)
         const colaActual = offlineStorageAdapter.obtenerCola();
         colaActual.push({
             idLocal: `OFF-${Date.now()}-${userId}`,
@@ -147,7 +151,6 @@ export const accesoService = {
         });
         offlineStorageAdapter.guardarCola(colaActual);
 
-        // 3. Actualizamos aforo y últimos movimientos locales de la sede
         if (Number(socio.id_rol) !== ROL_CLIENTE_EXTERNO) {
             estadoSedeLocal.aforoActual = tipoAccion === 'salida' 
                 ? Math.max(0, aforoPrevio - 1) 
@@ -269,6 +272,26 @@ export const accesoService = {
         } catch (error) {
             const mensajeError = error.response?.data?.mensaje || error.message || 'Error al obtener el historial de accesos.';
             throw new Error(mensajeError);
+        }
+    },
+
+    obtenerMisReservasCanchas: async () => {
+        try {
+            const response = await httpClient.get('/reservas-canchas/mis-reservas');
+            const data = response?.data?.data || response?.data || [];
+            return Array.isArray(data) ? data.slice(0, 5) : [];
+        } catch (error) {
+            return [];
+        }
+    },
+
+    obtenerMisInscripcionesClases: async () => {
+        try {
+            const response = await httpClient.get('/clases/mis-inscripciones');
+            const data = response?.data?.data || response?.data || [];
+            return Array.isArray(data) ? data.slice(0, 5) : [];
+        } catch (error) {
+            return [];
         }
     }
 };
