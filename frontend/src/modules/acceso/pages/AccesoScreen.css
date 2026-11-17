@@ -1,13 +1,24 @@
 /* Design Tokens Semánticos — Módulo de Control de Acceso (Unidad IV) */
 :root {
   --color-text-primary: #111827;
+  --color-text-heading: #1f2937;
   --color-text-secondary: #4b5563;
+  --color-text-label: #374151;
   --color-text-muted: #6b7280;
+  --color-text-subtle: #9ca3af;
+
   --color-surface-card: #ffffff;
   --color-surface-subtle: #f9fafb;
+  --color-surface-muted: #f3f4f6;
+  --color-surface-accent-soft: #eef2ff;
+  --color-surface-overlay: rgba(0, 0, 0, 0.5);
+
   --color-border-subtle: #e5e7eb;
+  --color-border-input: #d1d5db;
   --color-border-divider: #f3f4f6;
 
+  --color-action-primary: #4f46e5;
+  --color-action-primary-hover: #4338ca;
   --color-action-external: #10b981;
   --color-action-external-hover: #059669;
 
@@ -15,6 +26,11 @@
   --color-status-success-badge: #dcfce7;
   --color-status-success-text: #166534;
   --color-status-success-border: #22c55e;
+  --color-status-success-strong: #16a34a;
+
+  --color-status-warning-badge: #fef3c7;
+  --color-status-warning-text: #d97706;
+  --color-status-warning-strong: #ea580c;
 
   --color-status-info-bg: #eff6ff;
   --color-status-info-badge: #e0e7ff;
@@ -25,8 +41,18 @@
   --color-status-danger-badge: #fee2e2;
   --color-status-danger-text: #b91c1c;
   --color-status-danger-border: #ef4444;
+  --color-status-danger-strong: #dc2626;
+
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 99px;
 }
 
+/* Layout general de pantallas del módulo */
 .acceso-screen-container {
   padding: 2rem 3rem;
   max-width: 1200px;
@@ -61,7 +87,7 @@
   background-color: var(--color-action-external);
   color: var(--color-surface-card);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -93,10 +119,11 @@
   margin-top: 1.5rem;
 }
 
+/* Alertas de estado */
 .acceso-alert {
   padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .acceso-alert--danger {
@@ -122,13 +149,178 @@
   font-size: 0.95rem;
 }
 
+/* Organismo: LectorQRForm */
+.lector-qr-card {
+  padding: 2rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background-color: var(--color-surface-card);
+  box-shadow: var(--shadow-card);
+  box-sizing: border-box;
+}
+
+.lector-qr-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 0.75rem;
+}
+
+.lector-qr-icon {
+  width: 45px;
+  height: 45px;
+  background-color: var(--color-surface-accent-soft);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.lector-qr-title {
+  margin: 0;
+  color: var(--color-text-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.lector-qr-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0.2rem 0 0 0;
+}
+
+.lector-qr-form {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.lector-qr-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border-subtle);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: var(--color-text-heading);
+}
+
+.lector-qr-input:focus {
+  border-color: var(--color-action-primary);
+}
+
+.lector-qr-btn {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--color-action-primary);
+  color: var(--color-surface-card);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.lector-qr-btn:hover:not(:disabled) {
+  background-color: var(--color-action-primary-hover);
+}
+
+.lector-qr-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Organismo: AforoCard */
+.aforo-card {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-card);
+  background-color: var(--color-surface-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.aforo-title {
+  margin: 0 0 1rem 0;
+  color: var(--color-text-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.aforo-value {
+  font-size: 4rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 1rem 0;
+}
+
+.aforo-value--optimal {
+  color: var(--color-status-success-strong);
+}
+
+.aforo-value--warning {
+  color: var(--color-status-warning-strong);
+}
+
+.aforo-value--full {
+  color: var(--color-status-danger-strong);
+}
+
+.aforo-max {
+  font-size: 1.5rem;
+  color: var(--color-text-subtle);
+  font-weight: 600;
+}
+
+.aforo-progress-track {
+  width: 100%;
+  height: 10px;
+  background-color: var(--color-surface-muted);
+  border-radius: var(--radius-pill);
+  margin: 1.5rem 0;
+  overflow: hidden;
+}
+
+.aforo-progress-bar {
+  height: 100%;
+  transition: width 0.5s ease-in-out;
+  border-radius: var(--radius-pill);
+}
+
+.aforo-progress-bar--optimal {
+  background-color: var(--color-status-success-strong);
+}
+
+.aforo-progress-bar--warning {
+  background-color: var(--color-status-warning-strong);
+}
+
+.aforo-progress-bar--full {
+  background-color: var(--color-status-danger-strong);
+}
+
+.aforo-caption {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* Organismo: HistorialAccesosTable y Tablas */
 .acceso-history-card {
   margin-top: 2.5rem;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   background-color: var(--color-surface-card);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-card);
 }
 
 .acceso-history-header {
@@ -184,16 +376,23 @@
   text-align: right;
 }
 
+/* Átomo: Badges de estado */
 .acceso-badge {
   padding: 4px 12px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 700;
+  display: inline-block;
 }
 
 .acceso-badge--success {
   background-color: var(--color-status-success-badge);
   color: var(--color-status-success-text);
+}
+
+.acceso-badge--warning {
+  background-color: var(--color-status-warning-badge);
+  color: var(--color-status-warning-text);
 }
 
 .acceso-badge--info {
@@ -204,4 +403,239 @@
 .acceso-badge--danger {
   background-color: var(--color-status-danger-badge);
   color: var(--color-status-danger-text);
+}
+
+/* Organismo: IngresoExternoModal */
+.acceso-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-surface-overlay);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.acceso-modal-card {
+  background-color: var(--color-surface-card);
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  width: 400px;
+  font-family: system-ui, sans-serif;
+  box-shadow: var(--shadow-elevated);
+}
+
+.acceso-modal-title {
+  margin-top: 0;
+  color: var(--color-text-heading);
+}
+
+.acceso-modal-desc {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.acceso-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.acceso-modal-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--color-text-label);
+}
+
+.acceso-modal-input {
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-input);
+  box-sizing: border-box;
+}
+
+.acceso-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.acceso-btn-secondary {
+  padding: 0.6rem 1.2rem;
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-label);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.acceso-btn-primary {
+  padding: 0.6rem 1.2rem;
+  background-color: var(--color-action-primary);
+  color: var(--color-surface-card);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Página: SocioDashboard */
+.socio-dashboard-container {
+  padding: 2rem 3rem;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.socio-dashboard-header {
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--color-border-divider);
+  padding-bottom: 1rem;
+  width: 100%;
+}
+
+.socio-dashboard-meta {
+  color: var(--color-text-label);
+}
+
+.socio-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 2rem;
+  width: 100%;
+  align-items: start;
+}
+
+.socio-section-card {
+  background-color: var(--color-surface-card);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
+  padding: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.socio-section-card--full {
+  grid-column: 1 / -1;
+}
+
+.socio-section-header {
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border-divider);
+  padding-bottom: 0.75rem;
+}
+
+.socio-section-title {
+  font-size: 1.15rem;
+  color: var(--color-text-heading);
+  margin: 0;
+  font-weight: 600;
+}
+
+.socio-section-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0.2rem 0 0 0;
+}
+
+.socio-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* Página: CredencialScreen (QR Dinámico) */
+.credencial-container {
+  padding: 2rem;
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+  font-family: system-ui, sans-serif;
+}
+
+.credencial-title {
+  color: var(--color-text-heading);
+}
+
+.credencial-subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.credencial-qr-box {
+  padding: 2rem;
+  background-color: var(--color-surface-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-elevated);
+  margin-bottom: 1rem;
+  display: inline-block;
+}
+
+.credencial-timer {
+  color: var(--color-status-success-strong);
+}
+
+.credencial-timer--expiring {
+  color: var(--color-status-danger-strong);
+}
+
+.credencial-dev-box {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: var(--color-surface-subtle);
+  border: 2px dashed var(--color-border-input);
+  border-radius: var(--radius-lg);
+  text-align: left;
+}
+
+.credencial-dev-title {
+  margin: 0 0 0.65rem 0;
+  color: var(--color-text-label);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.credencial-dev-desc {
+  margin: 0 0 0.65rem 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.credencial-dev-code {
+  display: block;
+  padding: 0.65rem;
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.credencial-copy-btn {
+  width: 100%;
+  padding: 0.65rem;
+  background-color: var(--color-action-primary);
+  color: var(--color-surface-card);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.credencial-copy-btn:hover {
+  background-color: var(--color-action-primary-hover);
 }
