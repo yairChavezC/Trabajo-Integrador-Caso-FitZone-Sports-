@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAcceso } from '../hooks/useAcceso.js';
 import { AforoCard } from '../components/AforoCard.jsx';
 import { LectorQRForm } from '../components/LectorQRForm.jsx';
 import { HistorialAccesosTable } from '../components/HistorialAccesosTable.jsx';
 import { IngresoExternoModal } from '../components/IngresoExternoModal.jsx';
+import { Snackbar } from '../components/Snackbar.jsx';
 import { useSede } from '../../../shared/context/SedeContext.jsx';
 import { useAuth } from '../../../core/auth/AuthContext.jsx';
 import { accesoService } from '../services/accesoService.js';
@@ -18,7 +20,11 @@ const mapearMovimientoPuerta = (m) => {
     return {
         id: m.id || Math.random(),
         hora: !isNaN(fechaRef)
-            ? fechaRef.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            ? fechaRef.toLocaleTimeString('es-AR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            })
             : '--:--',
         evento: esSalida ? `Salida (${nombreUsuario})` : `Ingreso (${nombreUsuario})`,
         estado: esSalida ? 'Finalizado' : 'Autorizado'
@@ -29,7 +35,7 @@ export const AccesoScreen = () => {
     const { usuario } = useAuth();
     const rolNumerico = Number(usuario?.rol) || Number(usuario?.id_rol) || 3;
 
-    const { loading, error, resultado, registrarIngresoUI } = useAcceso();
+    const { loading, registrarIngresoUI } = useAcceso();
     const { sedeSeleccionada } = useSede();
     const sedeIdActual = sedeSeleccionada?.id || 1;
 
@@ -39,23 +45,53 @@ export const AccesoScreen = () => {
     const [showModalExterno, setShowModalExterno] = useState(false);
     const [loadingExterno, setLoadingExterno] = useState(false);
 
+    // Estado del Snackbar
+    const [aviso, setAviso] = useState({
+        open: false,
+        type: 'info',
+        message: ''
+    });
+
+    const mostrarAviso = (type, message) => {
+        setAviso({
+            open: true,
+            type,
+            message
+        });
+    };
+
+    const cerrarAviso = useCallback(() => {
+        setAviso(prev => ({
+            ...prev,
+            open: false
+        }));
+    }, []);
+
     const sincronizarEstadoBD = async (sedeId) => {
         try {
             const payload = await accesoService.obtenerEstadoSede(sedeId);
             if (!payload) return;
 
             const aforoServidor = payload.aforoActual ?? payload.aforo;
+
             if (typeof aforoServidor === 'number') {
                 setAforoActual(aforoServidor);
             }
+
             if (typeof payload.aforoMaximo === 'number') {
                 setAforoMaximo(payload.aforoMaximo);
             }
 
             const movimientosRaw = payload.ultimosMovimientos || payload.movimientos || [];
-            setHistorial(Array.isArray(movimientosRaw) ? movimientosRaw.map(mapearMovimientoPuerta) : []);
+
+            setHistorial(
+                Array.isArray(movimientosRaw)
+                    ? movimientosRaw.map(mapearMovimientoPuerta)
+                    : []
+            );
+
         } catch (err) {
-            console.error("Error al sincronizar con la base de datos:", err);
+            console.error('Error al sincronizar con la base de datos:', err);
         }
     };
 
@@ -63,43 +99,90 @@ export const AccesoScreen = () => {
         if (sedeSeleccionada?.cupo) {
             setAforoMaximo(Number(sedeSeleccionada.cupo));
         }
+
         if (sedeIdActual && rolNumerico !== 3) {
             sincronizarEstadoBD(sedeIdActual);
         }
     }, [sedeIdActual, sedeSeleccionada, rolNumerico]);
 
+    // Registro de ingreso o salida mediante QR
     const handleEscanearQR = async (qrCode) => {
         try {
             const res = await registrarIngresoUI(qrCode, sedeIdActual);
+
             if (typeof res?.aforoActual === 'number') {
                 setAforoActual(res.aforoActual);
             }
+
             await sincronizarEstadoBD(sedeIdActual);
+
+            if (res?.autorizado === false) {
+                mostrarAviso(
+                    'error',
+                    res?.mensaje || 'Acceso denegado.'
+                );
+                return;
+            }
+
+            const mensaje = res?.mensaje || (
+                res?.tipoAccion === 'salida'
+                    ? 'Salida registrada correctamente.'
+                    : 'Ingreso autorizado correctamente.'
+            );
+
+            mostrarAviso(
+                'success',
+                mensaje
+            );
+
         } catch (err) {
             const nuevoRegistroError = {
                 id: Date.now(),
-                hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                hora: new Date().toLocaleTimeString('es-AR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }),
                 evento: 'Escaneo Rechazado / Denegado',
                 estado: 'Rechazado'
             };
+
             setHistorial(prev => [nuevoRegistroError, ...prev].slice(0, 5));
+
+            mostrarAviso(
+                'error',
+                err?.message || 'No se pudo registrar el acceso.'
+            );
         }
     };
 
+    // Registro de ingreso de cliente externo
     const handleIngresoExterno = async (datos) => {
         setLoadingExterno(true);
+
         try {
-            const res = await accesoService.registrarIngresoExterno(datos, sedeIdActual);
+            const res = await accesoService.registrarIngresoExterno(
+                datos,
+                sedeIdActual
+            );
+
             const payload = res?.data || res;
 
             setShowModalExterno(false);
+
             await sincronizarEstadoBD(sedeIdActual);
 
-            if (payload?.mensaje) {
-                alert(`✅ ${payload.mensaje}`);
-            }
+            mostrarAviso(
+                'success',
+                payload?.mensaje || 'El cliente externo fue registrado correctamente.'
+            );
+
         } catch (err) {
-            alert(`❌ ${err.message}`);
+            mostrarAviso(
+                'error',
+                err?.message || 'No se pudo registrar el cliente externo.'
+            );
+
         } finally {
             setLoadingExterno(false);
         }
@@ -111,13 +194,21 @@ export const AccesoScreen = () => {
 
     return (
         <div className="acceso-screen-container">
+
             <header className="acceso-header">
                 <div>
                     <h2 className="acceso-title">Panel de Recepción</h2>
+
                     <p className="acceso-subtitle">
-                        Control de accesos de <strong>{sedeSeleccionada ? `${sedeSeleccionada.nombre} (${sedeSeleccionada.ciudad})` : 'Cargando...'}</strong>
+                        Control de accesos de{' '}
+                        <strong>
+                            {sedeSeleccionada
+                                ? `${sedeSeleccionada.nombre} (${sedeSeleccionada.ciudad})`
+                                : 'Cargando...'}
+                        </strong>
                     </p>
                 </div>
+
                 <button
                     onClick={() => setShowModalExterno(true)}
                     className="acceso-btn-externo"
@@ -127,36 +218,21 @@ export const AccesoScreen = () => {
             </header>
 
             <div className="acceso-grid">
+
                 <div className="acceso-col-scanner">
-                    <LectorQRForm onEscanear={handleEscanearQR} loading={loading} />
-
-                    <div className="acceso-feedback-slot">
-                        {error && (
-                            <div className="acceso-alert acceso-alert--danger">
-                                <strong>❌ Acceso Denegado: </strong>
-                                {typeof error === 'string' ? error : error.message}
-                            </div>
-                        )}
-
-                        {resultado && resultado.autorizado && (
-                            <div className={`acceso-alert ${resultado.tipoAccion === 'ingreso' ? 'acceso-alert--success' : 'acceso-alert--info'}`}>
-                                <strong>
-                                    {resultado.tipoAccion === 'ingreso' ? '✅ ¡Ingreso Autorizado! ' : '👋 ¡Salida Registrada! '}
-                                    {resultado.modoOffline && ' (Modo Offline)'}
-                                </strong>
-                                <p className="acceso-alert-text">
-                                    {resultado.tipoAccion === 'ingreso'
-                                        ? 'El socio ingresó correctamente a las instalaciones. El aforo ha sumado +1.'
-                                        : 'El socio se ha retirado de la sucursal. El aforo se ha liberado en -1.'}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    <LectorQRForm
+                        onEscanear={handleEscanearQR}
+                        loading={loading}
+                    />
                 </div>
 
                 <div className="acceso-col-aforo">
-                    <AforoCard aforoActual={aforoActual} aforoMaximo={aforoMaximo} />
+                    <AforoCard
+                        aforoActual={aforoActual}
+                        aforoMaximo={aforoMaximo}
+                    />
                 </div>
+
             </div>
 
             <HistorialAccesosTable historial={historial} />
@@ -168,6 +244,15 @@ export const AccesoScreen = () => {
                     loading={loadingExterno}
                 />
             )}
+
+            {/* Avisos de ingreso, salida y errores */}
+            <Snackbar
+                open={aviso.open}
+                type={aviso.type}
+                message={aviso.message}
+                onClose={cerrarAviso}
+            />
+
         </div>
     );
 };
