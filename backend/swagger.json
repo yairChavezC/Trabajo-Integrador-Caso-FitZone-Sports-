@@ -3,7 +3,7 @@
   "info": {
     "title": "FitZone Sports API",
     "version": "1.0.0",
-    "description": "Contrato OpenAPI 3.0 del sistema de gestión deportiva FitZone Sports (Autenticación, Grilla de Canchas y Reservas con Orquestación Saga)."
+    "description": "Contrato OpenAPI 3.0 del sistema de gestión deportiva FitZone Sports (Autenticación, Grilla de Canchas, Reservas y Módulo de Pagos M5)."
   },
   "servers": [
     {
@@ -23,6 +23,10 @@
     {
       "name": "Reservas de Canchas",
       "description": "Checkout transaccional con bloqueo pesimista, Saga de pagos y consulta de reservas"
+    },
+    {
+      "name": "Pagos",
+      "description": "Procesamiento de pagos con pasarelas estándar (MercadoPago/MODO), idempotencia y emisión de comprobantes PDF (Patrón Builder)"
     }
   ],
   "components": {
@@ -153,6 +157,38 @@
             "enum": ["pendiente", "confirmada", "cancelada"],
             "example": "confirmada"
           }
+        }
+      },
+      "PagoRequest": {
+        "type": "object",
+        "required": ["userId", "monto", "metodoPago"],
+        "properties": {
+          "userId": { "type": "integer", "example": 10 },
+          "reservaId": { "type": "integer", "nullable": true, "example": 55 },
+          "monto": { "type": "number", "example": 16000 },
+          "metodoPago": {
+            "type": "string",
+            "enum": ["MERCADOPAGO", "MODO"],
+            "example": "MERCADOPAGO"
+          },
+          "concepto": { "type": "string", "example": "Cancha Paddle 1 - 20:00 hs" },
+          "cardToken": { "type": "string", "example": "tok_mp_ok_123" }
+        }
+      },
+      "PagoItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "userId": { "type": "integer", "example": 10 },
+          "reservaId": { "type": "integer", "nullable": true, "example": 55 },
+          "monto": { "type": "number", "example": 16000 },
+          "metodoPago": { "type": "string", "example": "MERCADOPAGO" },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "APROBADO", "RECHAZADO"],
+            "example": "APROBADO"
+          },
+          "transaccionExternaId": { "type": "string", "example": "mp_ok_987654" }
         }
       },
       "ErrorResponse": {
@@ -386,6 +422,117 @@
           },
           "401": {
             "description": "No se pudo determinar la identidad del usuario",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pagos": {
+      "post": {
+        "tags": ["Pagos"],
+        "summary": "Procesar un pago mediante pasarela (MercadoPago / MODO)",
+        "description": "Valida seguridad (bloqueo de tarjetas en crudo - RNF-02 / ADR-010), aplica idempotencia si se provee clave y ejecuta el cobro mediante el adapter correspondiente.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string", "example": "idem-key-abc-999" },
+            "description": "Clave opcional de idempotencia para evitar cobros duplicados"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PagoRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pago procesado y registrado con éxito",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "payment": { "$ref": "#/components/schemas/PagoItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos de pago inválidos o datos de tarjeta sensibles detectados",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Token JWT ausente o inválido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto por pago duplicado detectado por idempotencia",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pagos/{id}/comprobante": {
+      "get": {
+        "tags": ["Pagos"],
+        "summary": "Generar y descargar el comprobante de pago en PDF",
+        "description": "Genera de forma dinámica el comprobante PDF del pago correspondiente utilizando el patrón Builder (RF-14).",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "example": 1 },
+            "description": "ID del pago registrado"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comprobante PDF generado exitosamente",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Pago no encontrado",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" }

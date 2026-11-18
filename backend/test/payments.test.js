@@ -1,23 +1,24 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import express from 'express';
 
-import { ESTADOS_PAGO, Pago } from './domain/Pago.js';
+import { ESTADOS_PAGO, Pago } from '../src/modules/payments/domain/Pago.js';
 import {
   MercadoPagoAdapter,
   ModoAdapter,
   PasarelaFactory
-} from './gateways/PasarelaPago.js';
+} from '../src/modules/payments/gateways/PasarelaPago.js';
 import {
   DuplicatePaymentError,
   InvalidPaymentTransitionError,
   SensitiveCardDataError,
   UnsupportedGatewayError
-} from './errors.js';
-import { InMemoryPagoRepository } from './repositories/inMemoryPaymentRepository.js';
-import { createPaymentService } from './services/paymentService.js';
-import { generarComprobantePdf } from './services/comprobantePdfService.js';
+} from '../src/modules/payments/errors.js';
+import { InMemoryPagoRepository } from '../src/modules/payments/repositories/inMemoryPaymentRepository.js';
+import { createPaymentService } from '../src/modules/payments/services/paymentService.js';
+import { generarComprobantePdf } from '../src/modules/payments/services/comprobantePdfService.js';
 
-describe('Módulo de Pagos (M5) - Dominio, Patrones y Concurrencia', () => {
+describe('Módulo de Pagos (M5) - Dominio, Patrones, Concurrencia e Integración HTTP', () => {
   let repository;
   let service;
 
@@ -143,5 +144,59 @@ describe('Módulo de Pagos (M5) - Dominio, Patrones y Concurrencia', () => {
     const { buffer, metadata } = generarComprobantePdf(res.payment);
     assert.equal(metadata.numeroComprobante, 'FZ-000001');
     assert.equal(buffer.subarray(0, 8).toString('utf8'), '%PDF-1.4');
+  });
+
+  it('Integración HTTP: POST /api/pagos procesa el pago y GET /:id/comprobante devuelve PDF', async () => {
+    const app = express();
+    app.use(express.json());
+
+    const router = express.Router();
+    router.post('/', async (req, res) => {
+      try {
+        const resultado = await service.processPayment(req.body);
+        res.status(201).json(resultado);
+      } catch (err) {
+        res.status(err.status || 400).json({ error: err.message });
+      }
+    });
+
+    router.get('/:id/comprobante', async (req, res) => {
+      try {
+        const pago = await repository.findById(Number(req.params.id));
+        if (!pago) return res.status(404).json({ error: 'Pago no encontrado' });
+        const { buffer } = generarComprobantePdf(pago);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.send(buffer);
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    app.use('/api/pagos', router);
+
+    const server = app.listen(0);
+    const port = server.address().port;
+
+    try {
+      const resPago = await fetch(`http://localhost:${port}/api/pagos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 10,
+          monto: 16000,
+          metodoPago: 'MODO',
+          concepto: 'Plan Mensual Básico'
+        })
+      });
+      assert.equal(resPago.status, 201);
+      const dataPago = await resPago.json();
+      const pagoId = dataPago.payment?.id ?? dataPago.id;
+
+      const resPdf = await fetch(`http://localhost:${port}/api/pagos/${pagoId}/comprobante`);
+      assert.equal(resPdf.status, 200);
+      assert.equal(resPdf.headers.get('content-type'), 'application/pdf');
+    } finally {
+      server.close();
+    }
   });
 });
