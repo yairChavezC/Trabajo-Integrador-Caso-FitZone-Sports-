@@ -93,6 +93,26 @@ export const createReservaCanchaRepository = (pool) => {
   };
 
   /**
+   * Busca una reserva por ID (necesario para validar transiciones de estado en el dominio).
+   */
+  const findReservaById = async (idReserva) => {
+    const query = `
+      SELECT 
+        id, 
+        id_cancha, 
+        id_usuario, 
+        fecha_inicio, 
+        fecha_fin, 
+        monto_total, 
+        estado
+      FROM public.reserva_cancha
+      WHERE id = $1;
+    `;
+    const { rows } = await pool.query(query, [idReserva]);
+    return rows[0] || null;
+  };
+
+  /**
    * Actualiza el estado de la reserva (confirmada, cancelada, etc.).
    */
   const updateEstadoReserva = async (idReserva, nuevoEstado) => {
@@ -138,6 +158,7 @@ export const createReservaCanchaRepository = (pool) => {
     existeSolapamiento,
     insertReserva,
     insertReservaConBloqueoPesimista,
+    findReservaById,
     updateEstadoReserva,
     findReservasByUsuario
   };

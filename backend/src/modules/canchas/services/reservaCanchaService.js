@@ -1,16 +1,25 @@
-export const createReservaCanchaService = (reservaCanchaRepo) => {
+import {
+  validarInvariantesNuevaReserva,
+  validarTransicionReserva
+} from '../domain/reservaCanchaDomain.js';
+
+export const createReservaCanchaService = (
+  reservaCanchaRepo,
+  validarTransicion = validarTransicionReserva
+) => {
   /**
-   * Valida reglas de negocio y delega la creación atómica con bloqueo pesimista.
+   * Valida invariantes de dominio y delega la creación atómica con bloqueo pesimista.
    */
   const crearReservaPendiente = async ({ idCancha, idUsuario, fechaInicio, fechaFin, monto }) => {
-    // 1. Validar que la fecha de fin sea posterior a la de inicio
-    if (new Date(fechaInicio) >= new Date(fechaFin)) {
-      const error = new Error('La fecha/hora de inicio debe ser anterior a la de fin.');
-      error.status = 400;
-      throw error;
+    // 1. Delegar validación de invariantes al Dominio
+    try {
+      validarInvariantesNuevaReserva({ fechaInicio, fechaFin, monto });
+    } catch (domainError) {
+      domainError.status = 400;
+      throw domainError;
     }
 
-    // 2. Ejecutar inserción con bloqueo pesimista (FOR UPDATE) y respaldo de constraint en BD
+    // 2. Ejecutar inserción atómica con bloqueo pesimista (FOR UPDATE) y respaldo de constraint en BD
     try {
       return await reservaCanchaRepo.insertReservaConBloqueoPesimista({
         idCancha,
@@ -33,18 +42,26 @@ export const createReservaCanchaService = (reservaCanchaRepo) => {
   };
 
   /**
-   * Cambia el estado (confirmada tras pago aprobado o cancelada por compensación/rechazo).
+   * Cambia el estado validando primero mediante la máquina de estados del dominio (Patrón State).
    */
   const actualizarEstadoReserva = async (idReserva, nuevoEstado) => {
-    const reservaActualizada = await reservaCanchaRepo.updateEstadoReserva(idReserva, nuevoEstado);
+    const reservaActual = await reservaCanchaRepo.findReservaById(idReserva);
 
-    if (!reservaActualizada) {
+    if (!reservaActual) {
       const error = new Error(`No se encontró la reserva con ID ${idReserva}`);
       error.status = 404;
       throw error;
     }
 
-    return reservaActualizada;
+    // Validar transición en el dominio y mapear a error HTTP si es ilegal
+    try {
+      validarTransicion(reservaActual.estado, nuevoEstado);
+    } catch (domainError) {
+      domainError.status = domainError.domainCode === 'TRANSICION_INVALIDA' ? 409 : 400;
+      throw domainError;
+    }
+
+    return await reservaCanchaRepo.updateEstadoReserva(idReserva, nuevoEstado);
   };
 
   const obtenerReservasPorUsuario = async (idUsuario) => {
