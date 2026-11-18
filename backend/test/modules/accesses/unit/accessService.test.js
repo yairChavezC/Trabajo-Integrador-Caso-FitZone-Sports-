@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AccessService } from './accessService.js';
+import { AccessService } from '../../../../src/modules/accesses/services/accessService.js';
 
 // Stub de Reloj Fijo (Unidad V - Diapositiva 14: evita acoplamiento a Date.now() real)
 const RELOJ_FIJO_MS = 1763228400000; // 2025-11-15T17:40:00.000Z
@@ -240,4 +240,63 @@ test('RNF-01: sincroniza lote de eventos offline en orden cronológico respetand
   assert.equal(res.procesados, 2);
   assert.equal(res.errores, 0);
   assert.deepEqual(operaciones, ['ingreso:7', 'salida:7']);
+});
+
+
+// --- PRUEBAS DE PADRÓN Y SINCRONIZACIÓN OFFLINE (RNF-01) ---
+
+test('RNF-01: obtiene el padrón offline y devuelve la fecha de sincronización', async () => {
+  const sociosMock = [
+    { id: 10, nombre: 'Luis Advíncula' },
+    { id: 11, nombre: 'Socio de prueba' }
+  ];
+
+  const { service } = crearServicioConStubs({
+    getPadronOffline: async () => sociosMock
+  });
+
+  const res = await service.obtenerPadronOffline();
+
+  assert.deepEqual(res.socios, sociosMock);
+  assert.equal(
+    res.fechaSincronizacion,
+    new Date(RELOJ_FIJO_MS).toISOString()
+  );
+});
+
+test('RNF-01: devuelve un padrón vacío cuando el repositorio no retorna un arreglo', async () => {
+  const { service } = crearServicioConStubs({
+    getPadronOffline: async () => null
+  });
+
+  const res = await service.obtenerPadronOffline();
+
+  assert.deepEqual(res.socios, []);
+  assert.equal(
+    res.fechaSincronizacion,
+    new Date(RELOJ_FIJO_MS).toISOString()
+  );
+});
+
+test('RNF-01: contabiliza los errores cuando falla una operación durante la sincronización offline', async () => {
+  const { service } = crearServicioConStubs({
+    checkAccesoActivoGlobal: async () => {
+      throw new Error('Error simulado de conexión');
+    }
+  });
+
+  const eventos = [
+    {
+      idLocal: '1',
+      usuarioId: 10,
+      sedeId: 1,
+      tipoAccion: 'ingreso',
+      fechaEvento: '2026-11-10T10:00:00.000Z'
+    }
+  ];
+
+  const res = await service.sincronizarAccesosOffline(eventos);
+
+  assert.equal(res.procesados, 0);
+  assert.equal(res.errores, 1);
 });
