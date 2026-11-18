@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "node --test",
-    "test:coverage": "c8 --check-coverage --per-file --lines 15 --functions 0 --branches 10 --include=src/modules/activities/services/activityService.js --include=src/modules/activities/repositories/activityRepository.js --include=src/modules/activities/repositories/inscriptionRepository.js --include=src/modules/accesses/services/accessService.js --include=src/modules/auth/authDomain.js --include=src/modules/auth/authService.js --include=src/modules/canchas/domain/canchaDomain.js --include=src/modules/canchas/domain/reservaCanchaDomain.js --include=src/modules/canchas/services/canchaService.js --include=src/modules/canchas/services/reservaCanchaService.js --include=src/modules/payments/**/*.js npm test",
+    "test:coverage": "c8 --check-coverage --per-file --lines 15 --functions 0 --branches 10 --include=src/modules/activities/services/activityService.js --include=src/modules/activities/repositories/activityRepository.js --include=src/modules/activities/repositories/inscriptionRepository.js --include=src/modules/accesses/services/accessService.js --include=src/modules/auth/authDomain.js --include=src/modules/auth/authService.js --include=src/modules/canchas/domain/canchaDomain.js --include=src/modules/canchas/domain/reservaCanchaDomain.js --include=src/modules/canchas/services/canchaService.js --include=src/modules/canchas/services/reservaCanchaService.js --include=src/modules/payments/**/*.js --include=src/modules/memberships/services/*.js --include=src/modules/memberships/routes/*.js --include=src/modules/users/services/*.js npm test",
     "dev": "node --watch src/index.js",
     "start": "node src/index.js"
   },
