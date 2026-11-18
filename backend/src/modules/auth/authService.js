@@ -1,37 +1,46 @@
-import jwt from 'jsonwebtoken';
-import pool from '../../config/db.js';
-import { buscarUsuarioPorNombre } from './authRepository.js';
+import * as defaultAuthDomain from './authDomain.js';
 
-export const realizarLogin = async (nombre_usuario, contrasenia) => {
-    // 1. Buscamos al usuario en la base de datos
-    const usuario = await buscarUsuarioPorNombre(nombre_usuario);
+export const createAuthService = ({
+  authRepo,
+  jwtLib,
+  jwtSecret,
+  authDomain = defaultAuthDomain
+}) => {
+  if (!jwtSecret) {
+    throw new Error('Falta la configuración JWT_SECRET al inicializar authService.');
+  }
 
+  const realizarLogin = async (nombre_usuario, contrasenia) => {
+    // 1. Validar invariantes de entrada en el dominio
+    const { identificadorNormalizado, contraseniaNormalizada } =
+      authDomain.validarCredencialesEntrada(nombre_usuario, contrasenia);
+
+    // 2. Buscar usuario activo en el repositorio
+    const usuario = await authRepo.buscarUsuarioPorNombre(identificadorNormalizado);
     if (!usuario) {
-        throw new Error('AUTH_FAILED');
+      throw new Error('AUTH_FAILED');
     }
 
-    // 2. Validamos la contraseña utilizando la función criptográfica de la base de datos
-    const sqlCheck = "SELECT encode(digest($1, 'sha256'), 'hex') = $2 AS es_valida";
-    const result = await pool.query(sqlCheck, [String(contrasenia).trim(), usuario.password]);
-
-    if (!result.rows[0]?.es_valida) {
-        throw new Error('AUTH_FAILED');
-    }
-
-    // 3. Generamos el Token JWT de sesión
-    const token = jwt.sign(
-        { id: usuario.id, dni: usuario.dni, rol: usuario.id_rol },
-        process.env.JWT_SECRET,
-        { expiresIn: '30m' }
+    // 3. Verificar contraseña delegando al repositorio
+    const esValida = await authRepo.verificarPassword(
+      contraseniaNormalizada,
+      usuario.password
     );
+    if (!esValida) {
+      throw new Error('AUTH_FAILED');
+    }
+
+    // 4. Construir payload y firmar token JWT
+    const payload = authDomain.construirPayloadSesion(usuario);
+    const token = jwtLib.sign(payload, jwtSecret, { expiresIn: '30m' });
 
     return {
-        token,
-        usuario: { 
-            id: usuario.id, 
-            nombre: usuario.nombre, 
-            rol: usuario.id_rol,
-            foto: usuario.foto || null
-        }
+      token,
+      usuario: authDomain.construirUsuarioAutenticadoDTO(usuario)
     };
+  };
+
+  return {
+    realizarLogin
+  };
 };
