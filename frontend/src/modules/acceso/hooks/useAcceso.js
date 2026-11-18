@@ -1,10 +1,11 @@
+
 import { useState } from 'react';
 import { accesoService } from '../services/accesoService.js';
 
 export const useAcceso = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [resultado, setResultado] = useState(null); 
+    const [resultado, setResultado] = useState(null);
 
     const registrarIngresoUI = async (qrCode, sedeId) => {
         setLoading(true);
@@ -13,14 +14,17 @@ export const useAcceso = () => {
 
         try {
             const res = await accesoService.registrarEscaneo(qrCode, sedeId);
-            const payload = res?.data?.data || res?.data || res;
 
-            setResultado(payload);
-            return payload;
+            // El servicio ya devuelve el resultado del backend.
+            // No debemos extraer res.data porque puede contener
+            // el registro de acceso de una salida.
+            setResultado(res);
+
+            return res;
         } catch (err) {
             const mensajeError = err.message || "Error al procesar la operación.";
             setError(mensajeError);
-            throw err; 
+            throw err;
         } finally {
             setLoading(false);
         }
