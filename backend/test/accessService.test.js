@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AccessService } from '../../../../src/modules/accesses/services/accessService.js';
+import { AccessService } from '../src/modules/accesses/services/accessService.js';
 
 // Stub de Reloj Fijo (Unidad V - Diapositiva 14: evita acoplamiento a Date.now() real)
 const RELOJ_FIJO_MS = 1763228400000; // 2025-11-15T17:40:00.000Z
