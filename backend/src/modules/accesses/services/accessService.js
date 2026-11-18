@@ -420,9 +420,9 @@ export class AccessService {
                         resultados.procesados++;
                     }
                 } else if (ev.tipoAccion === 'salida') {
-                    const salida = await accessRepository.registrarSalida
-                        ? await this.repo.registrarSalida(ev.usuarioId, ev.sedeId, ev.fechaEvento)
-                        : null;
+                    const salida = this.repo.registrarSalida
+    ? await this.repo.registrarSalida(ev.usuarioId, ev.sedeId, ev.fechaEvento)
+    : null;
                     if (salida) resultados.procesados++;
                 }
             } catch (err) {

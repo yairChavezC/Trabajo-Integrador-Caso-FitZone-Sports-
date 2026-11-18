@@ -1,0 +1,399 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FitZone Sports API",
+    "version": "1.0.0",
+    "description": "Contrato OpenAPI 3.0 del sistema de gestión deportiva FitZone Sports (Autenticación, Grilla de Canchas y Reservas con Orquestación Saga)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Servidor de Desarrollo Local / Docker"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Autenticación y emisión de tokens JWT"
+    },
+    {
+      "name": "Canchas",
+      "description": "Consulta de disponibilidad horaria y tarifas dinámicas (Patrón Strategy)"
+    },
+    {
+      "name": "Reservas de Canchas",
+      "description": "Checkout transaccional con bloqueo pesimista, Saga de pagos y consulta de reservas"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Ingrese el token JWT obtenido en POST /auth/login"
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": ["nombre_usuario", "contrasenia"],
+        "properties": {
+          "nombre_usuario": {
+            "type": "string",
+            "description": "DNI o contacto/email del usuario",
+            "example": "40123456"
+          },
+          "contrasenia": {
+            "type": "string",
+            "format": "password",
+            "example": "123456"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "mensaje": {
+            "type": "string",
+            "example": "Login exitoso"
+          },
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "usuario": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer", "example": 1 },
+              "nombre": { "type": "string", "example": "Juan Pérez" },
+              "rol": { "type": "integer", "example": 2 },
+              "foto": { "type": "string", "nullable": true, "example": null }
+            }
+          }
+        }
+      },
+      "SlotDisponibilidad": {
+        "type": "object",
+        "properties": {
+          "inicio": { "type": "string", "example": "18:00" },
+          "fin": { "type": "string", "example": "19:00" },
+          "esPico": { "type": "boolean", "example": true },
+          "precio": { "type": "number", "example": 22000 },
+          "precioSocio": { "type": "number", "example": 18700 },
+          "estado": {
+            "type": "string",
+            "enum": ["libre", "pendiente", "confirmada"],
+            "example": "libre"
+          }
+        }
+      },
+      "CanchaGrilla": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "nombre": { "type": "string", "example": "Cancha Pádel 1" },
+          "tipo": { "type": "string", "example": "PAD" },
+          "descripcion": {
+            "type": "string",
+            "example": "Césped Sintético Monofilamento Azul WPT"
+          },
+          "precioBase": { "type": "number", "example": 18000 },
+          "slots": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SlotDisponibilidad" }
+          }
+        }
+      },
+      "CheckoutReservaRequest": {
+        "type": "object",
+        "required": ["idCancha", "fechaInicio", "fechaFin", "monto"],
+        "properties": {
+          "idCancha": { "type": "integer", "example": 1 },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-20T18:00:00"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-20T19:00:00"
+          },
+          "monto": { "type": "number", "example": 18700 },
+          "metodoPago": {
+            "type": "string",
+            "enum": ["TARJETA", "TRANSFERENCIA", "EFECTIVO"],
+            "default": "TARJETA",
+            "example": "TARJETA"
+          }
+        }
+      },
+      "ReservaItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 15 },
+          "idCancha": { "type": "integer", "example": 1 },
+          "nombreCancha": { "type": "string", "example": "Cancha Pádel 1" },
+          "tipoCancha": { "type": "string", "example": "PAD" },
+          "idUsuario": { "type": "integer", "example": 3 },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-20T18:00:00.000Z"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-20T19:00:00.000Z"
+          },
+          "montoTotal": { "type": "number", "example": 18700 },
+          "estado": {
+            "type": "string",
+            "enum": ["pendiente", "confirmada", "cancelada"],
+            "example": "confirmada"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Descripción del error" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Iniciar sesión y obtener token JWT",
+        "description": "Autentica al usuario mediante DNI o contacto y contraseña, devolviendo un token JWT válido por 30 minutos.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autenticación exitosa",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Usuario o contraseña incorrectos"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/canchas/disponibilidad": {
+      "get": {
+        "tags": ["Canchas"],
+        "summary": "Obtener grilla de canchas y slots horarios por sede y fecha",
+        "description": "Devuelve las canchas disponibles de una sede con sus franjas horarias, estado de ocupación y tarifas calculadas (estándar y socio).",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "idSede",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer", "example": 1 },
+            "description": "ID de la sede deportiva"
+          },
+          {
+            "name": "fecha",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date", "example": "2026-11-20" },
+            "description": "Fecha a consultar en formato YYYY-MM-DD"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grilla de disponibilidad obtenida exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/CanchaGrilla" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros idSede o fecha faltantes",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Token JWT ausente o inválido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reservas-canchas/checkout": {
+      "post": {
+        "tags": ["Reservas de Canchas"],
+        "summary": "Reservar cancha y procesar pago (Saga con Bloqueo Pesimista)",
+        "description": "Crea una reserva en estado pendiente adquiriendo bloqueo pesimista (FOR UPDATE) sobre la cancha y orquesta el pago. Si el pago es rechazado, compensa cancelando la reserva.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string", "example": "res-20261120-001" },
+            "description": "Clave opcional de idempotencia para evitar cobros duplicados"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CheckoutReservaRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reserva procesada y confirmada/pendiente de acreditación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": {
+                      "type": "string",
+                      "example": "Reserva procesada exitosamente."
+                    },
+                    "data": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos faltantes o intervalo horario inválido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "402": {
+            "description": "Pago rechazado por la pasarela (reserva compensada a cancelada)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": {
+                      "type": "string",
+                      "example": "Pago rechazado por fondos insuficientes."
+                    },
+                    "data": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cancha inexistente",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de concurrencia: el horario ya se encuentra ocupado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reservas-canchas/mis-reservas": {
+      "get": {
+        "tags": ["Reservas de Canchas"],
+        "summary": "Listar historial de reservas del usuario autenticado",
+        "description": "Obtiene todas las reservas asociadas al usuario identificado en el token JWT.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Listado de reservas del usuario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ReservaItem" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No se pudo determinar la identidad del usuario",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
