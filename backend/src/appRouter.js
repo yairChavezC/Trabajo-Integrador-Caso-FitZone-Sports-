@@ -6,30 +6,28 @@ import { verificarToken } from './core/middlewares/authMiddleware.js';
 import accessRoutes from './modules/accesses/routes/accessRoutes.js';
 import paymentRoutes from './modules/payments/routes/paymentRoutes.js';
 import activityRoutes from './modules/activities/routes/activityRoutes.js';
-import usersRoutes from './modules/users/users.routes.js';
-import plansRoutes from './modules/memberships/plans.routes.js';
+import usersRoutes from './modules/users/routes/users.routes.js';
 import reservaCanchaRoutes from './modules/reservaCancha/reservaCanchaRoutes.js';
-import subscriptionsRoutes from './modules/memberships/subscriptions.routes.js';
+
+import { plansRouter, subscriptionsRouter } from './modules/memberships/memberships.module.js';
 
 const router = Router();
 
-//RUTAS PÚBLICAS (No piden token)
+// RUTAS PÚBLICAS (No piden token)
 router.use('/auth', authRoutes);
 
-
-
-//A partir de esta línea, cualquier ruta definida abajo exige token obligatorio
+// A partir de esta línea, cualquier ruta definida abajo exige token obligatorio
 router.use(verificarToken);
 
-//RUTAS PROTEGIDAS (Exigen token)
+// RUTAS PROTEGIDAS (Exigen token)
 router.use('/sedes', sedeRoutes);
 router.use('/canchas', canchasRoutes);
 router.use('/reservas-canchas', reservaCanchaRoutes);
 router.use('/accesses', accessRoutes);
-router.use('/payments', paymentRoutes); // <-- Protegido nuevamente abajo de la barrera
+router.use('/payments', paymentRoutes);
 router.use('/clases', activityRoutes);
 router.use('/users', usersRoutes);
-router.use('/plans', plansRoutes);
-router.use('/memberships', subscriptionsRoutes);
+router.use('/plans', plansRouter);
+router.use('/memberships', subscriptionsRouter);
 
 export default router;
