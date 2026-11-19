@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,31 +14,42 @@ import { useMembers } from '../hooks/useMembers';
 import MemberCard from '../components/MemberCard';
 import NuevoSocioModal from '../components/NuevoSocioModal';
 import { PERFILES_ALTA, ROLES } from '../constants';
+import { esSocioOExterno } from '../session';
 import './MembershipsPage.css';
 import { Link } from 'react-router-dom';
 
 const PAGE_SIZE = 10;
 
 function getEstado(member) {
-  if (member.idRol === ROLES.CLIENTE_EXTERNO) return 'Sin membresía';
+  const tieneMembresia = Boolean(member.fechaProximoVencimiento);
+
+  // El cliente externo solo figura "Sin membresía" si todavía no contrató ninguna
+  if (member.idRol === ROLES.CLIENTE_EXTERNO && !tieneMembresia) return 'Sin membresía';
   if (!member.activo) return 'Suspendido';
   return member.enMora ? 'Vencido' : 'Activo';
 }
 
 export default function MembershipsPage() {
   const { members, loading, error, reload } = useMembers();
+  const restringido = esSocioOExterno();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [profileFilter, setProfileFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
+  const [snackbar, setSnackbar] = useState(null);
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    if (!snackbar) return;
+    const timer = setTimeout(() => setSnackbar(null), 3500);
+    return () => clearTimeout(timer);
+  }, [snackbar]);
+
   const usuarios = useMemo(
-    () => members.map((m) => ({ ...m, estado: getEstado(m) })),
+    () => (Array.isArray(members) ? members.map((m) => ({ ...m, estado: getEstado(m) })) : []),
     [members]
   );
 
-  // Los contadores de arriba cuentan solo a los socios: los clientes externos no tienen membresía
   const soloSocios = usuarios.filter((u) => u.idRol === ROLES.SOCIO);
   const total = usuarios.length;
   const activos = soloSocios.filter((s) => s.estado === 'Activo').length;
@@ -53,7 +64,7 @@ export default function MembershipsPage() {
   const filtered = usuarios.filter((u) => {
     const query = search.trim().toLowerCase();
     const matchesSearch =
-      !query || u.nombre.toLowerCase().includes(query) || String(u.dni).includes(query);
+      !query || u.nombre?.toLowerCase().includes(query) || String(u.dni || '').includes(query);
     const matchesStatus = statusFilter === 'all' || u.estado === statusFilter;
     const matchesProfile = profileFilter === 'all' || String(u.idRol) === profileFilter;
     return matchesSearch && matchesStatus && matchesProfile;
@@ -80,7 +91,13 @@ export default function MembershipsPage() {
   }
 
   function handleNuevoSocio() {
+    if (restringido) return;
     setShowForm(true);
+  }
+
+  async function handleSocioCreado() {
+    await reload();
+    setSnackbar('Socio creado correctamente');
   }
 
   return (
@@ -99,14 +116,16 @@ export default function MembershipsPage() {
               Administrá los socios y sus membresías en un solo lugar.
             </p>
           </div>
-          <div className="title-actions">
-            <Link to="/socios/planes" className="secondary-button">
-              Planes
-            </Link>
-            <button className="primary-button" type="button" onClick={handleNuevoSocio}>
-              + Nuevo socio
-            </button>
-          </div>
+          {!restringido && (
+            <div className="title-actions">
+              <Link to="/socios/planes" className="secondary-button">
+                Planes
+              </Link>
+              <button className="primary-button" type="button" onClick={handleNuevoSocio}>
+                + Nuevo socio
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -206,7 +225,7 @@ export default function MembershipsPage() {
                   : 'Probá con otro nombre, DNI, perfil o estado de membresía.'}
               </p>
             </div>
-            {total === 0 && (
+            {total === 0 && !restringido && (
               <button className="primary-button" type="button" onClick={handleNuevoSocio}>
                 + Nuevo socio
               </button>
@@ -257,8 +276,29 @@ export default function MembershipsPage() {
         </div>
       </section>
 
-      {showForm && (
-        <NuevoSocioModal onClose={() => setShowForm(false)} onCreated={reload} />
+      {showForm && !restringido && (
+        <NuevoSocioModal onClose={() => setShowForm(false)} onCreated={handleSocioCreado} />
+      )}
+
+      {snackbar && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            right: '24px',
+            bottom: '24px',
+            zIndex: 200,
+            padding: '12px 18px',
+            borderRadius: '8px',
+            background: '#171a23',
+            color: '#ffffff',
+            fontSize: '13px',
+            fontWeight: 600,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+          }}
+        >
+          {snackbar}
+        </div>
       )}
     </main>
   );

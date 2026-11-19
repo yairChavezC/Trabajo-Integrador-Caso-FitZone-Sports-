@@ -33,13 +33,10 @@ httpClient.interceptors.response.use(
         if (error.response) {
             const status = error.response.status;
 
-            // Solo 401 (token expirado/inválido) cierra sesión y redirige al login.
-            // 403 (Forbidden) significa que el usuario no tiene permiso para esa acción,
-            // pero su sesión sigue siendo válida. Mostramos el error sin desloguear.
             if (status === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('sedeId');
-                localStorage.removeItem('user');
+                localStorage.removeItem('usuario');
 
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';

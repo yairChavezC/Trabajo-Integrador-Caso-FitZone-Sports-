@@ -1,3 +1,10 @@
+import { obtenerEstrategiaDePrecio } from '../domain/pricingStrategies.js';
+import {
+  createSubscriptionSubject,
+  auditRenewalObserver,
+  welcomeNotificationObserver,
+} from '../domain/subscriptionObserver.js';
+
 function httpError(message, status) {
   const error = new Error(message);
   error.status = status;
@@ -11,23 +18,48 @@ function sumarDias(fecha, dias) {
   return resultado;
 }
 
-// Recibe TODAS sus dependencias desde el ensamblador, nada se importa directo acá
-export function createSubscriptionsService({ plansRepository, subscriptionsRepository, paymentService, pool }) {
-  async function renovarMembresia({ idUsuario, idPlan }) {
+// Agregamos subscriptionSubject como parámetro opcional
+export function createSubscriptionsService({
+  plansRepository,
+  subscriptionsRepository,
+  paymentService,
+  pool,
+  subscriptionSubject,
+}) {
+  // Inicializamos el subject con los observers base si no viene inyectado desde afuera
+  const subject = subscriptionSubject ?? (() => {
+    const defaultSubject = createSubscriptionSubject();
+    defaultSubject.subscribe(auditRenewalObserver);
+    defaultSubject.subscribe(welcomeNotificationObserver);
+    return defaultSubject;
+  })();
+
+    async function renovarMembresia({ idUsuario, idPlan, metodoPago, paymentToken, idempotencyKey }) {
     const plan = await plansRepository.findById(idPlan);
     if (!plan || !plan.activo) {
       throw httpError('El plan no existe o no está disponible', 400);
     }
 
+    const tipoPlan = plan.tipo || plan.categoria || 'REGULAR';
+    const estrategia = obtenerEstrategiaDePrecio(tipoPlan);
+    const precioFinal = Number(estrategia.calcular(Number(plan.precio)));
+
     const resultadoPago = await paymentService.processPayment({
       userId: idUsuario,
-      monto: Number(plan.precio),
+      monto: precioFinal,
+      moneda: 'ARS',
+      metodoPago,
+      paymentToken,
       concepto: `Membresía - ${plan.nombre}`,
+      idempotencyKey,
     });
 
-    if (!resultadoPago.success) {
+    // Rechazado o pendiente de acreditación: no se extiende la membresía
+    const pagoPendiente = resultadoPago.payment?.estado === 'PENDIENTE';
+    if (!resultadoPago.success || pagoPendiente) {
       return {
         pagoAprobado: false,
+        pendiente: pagoPendiente,
         pago: resultadoPago.payment,
         mensaje: resultadoPago.message,
       };
@@ -52,6 +84,16 @@ export function createSubscriptionsService({ plansRepository, subscriptionsRepos
       suscripcion.id,
       resultadoPago.payment.id,
     ]);
+
+    // Observer: notificamos a todos los suscriptores tras confirmar la renovación
+    await subject.notify({
+      tipo: 'MEMBRESIA_RENOVADA',
+      idUsuario,
+      idPlan,
+      planNombre: plan.nombre,
+      montoPagado: precioFinal,
+      fechaProximoVencimiento: suscripcion.fecha_proximo_vencimiento,
+    });
 
     return {
       pagoAprobado: true,

@@ -10,6 +10,7 @@ import { useSede } from '../../../shared/context/SedeContext.jsx';
 import { useAuth } from '../../../core/auth/AuthContext.jsx';
 import { accesoService } from '../services/accesoService.js';
 import { SocioDashboard } from './SocioDashboard.jsx';
+import { Navigate } from 'react-router-dom';
 import './AccesoScreen.css';
 
 const mapearMovimientoPuerta = (m) => {
@@ -100,7 +101,7 @@ export const AccesoScreen = () => {
             setAforoMaximo(Number(sedeSeleccionada.cupo));
         }
 
-        if (sedeIdActual && rolNumerico !== 3) {
+        if (sedeIdActual && rolNumerico !== 3 && rolNumerico !== 2) {
             sincronizarEstadoBD(sedeIdActual);
         }
     }, [sedeIdActual, sedeSeleccionada, rolNumerico]);
@@ -130,9 +131,12 @@ export const AccesoScreen = () => {
                     : 'Ingreso autorizado correctamente.'
             );
 
+            const nombreExterno = payload?.usuario?.nombre || datos.nombre;
             mostrarAviso(
                 'success',
-                mensaje
+                payload?.yaEstabaRegistrado
+                    ? payload.mensaje
+                    : `Nuevo cliente externo ${nombreExterno} dado de alta e ingresado con éxito.`
             );
 
         } catch (err) {
@@ -190,6 +194,10 @@ export const AccesoScreen = () => {
 
     if (rolNumerico === 3) {
         return <SocioDashboard />;
+    }
+
+    if (rolNumerico === 2) {
+        return <Navigate to="/canchas" replace />;
     }
 
     return (

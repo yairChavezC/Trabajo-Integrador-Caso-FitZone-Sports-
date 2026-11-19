@@ -14,6 +14,10 @@ export async function createMember(memberData) {
   return httpClient.post('/users', memberData);
 }
 
+export async function updateMember(id, memberData) {
+  return httpClient.patch(`/users/${id}`, memberData);
+}
+
 export async function getMemberPagos(id) {
   return httpClient.get(`/users/${id}/pagos`);
 }
