@@ -1,0 +1,30 @@
+﻿flowchart TD
+    A([Socio se anota en lista de espera]) --> B[insertInscription estado = en_espera]
+    B --> C{La clase tiene cupos disponibles}
+    C -->|Si| D[Rechazar con 409: todavia hay cupos]
+    C -->|No| E[La inscripcion queda en espera ordenada por fecha_registro]
+
+    F[Se libera un cupo por cancelacion] --> G[offerAvailablePlaces dentro de BEGIN]
+    G --> H{confirmados menor que cupo}
+    H -->|No| I[La clase sigue completa]
+    H -->|Si| J[findNextWaitlist: siguiente socio por fecha_registro]
+    J --> K{Encontro socio}
+    K -->|No| I
+    K -->|Si| L[promoteWaitlistInscription: estado = notificado]
+    L --> M[waitlistSubject.notify dentro de la transaccion]
+    M --> N[NotificationPersistenceObserver: INSERT en notificaciones_clase_grupal]
+    N --> O[COMMIT: promocion y notificacion atomicas]
+    O --> P[ConsoleWaitlistObserver: log posterior al commit]
+
+    P --> Q{El socio acepta la oferta}
+    Q -->|Si, antes del vencimiento| R[acceptWaitlistOffer: estado = confirmado]
+    Q -->|No, la oferta vence| S[expireWaitlistOffers: estado = expirado]
+    S --> T[El cupo vuelve a ofrecerse al siguiente]
+
+    R --> U([Socio confirmado en la clase])
+
+    style A fill:#e1f5e1,stroke:#2e7d32
+    style U fill:#e1f5e1,stroke:#2e7d32
+    style D fill:#ffe6e6,stroke:#c62828
+    style I fill:#ffe6e6,stroke:#c62828
+    style O fill:#e3f2fd,stroke:#1565c0

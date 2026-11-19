@@ -1,0 +1,66 @@
+﻿%% Autor: Acosta, Marcela
+%% Fecha: 2026-11-18
+%% Versión: 1.1
+%%
+sequenceDiagram
+    autonumber
+    actor Socio as Socio
+    participant API as API REST /clases/{id}/reservas (POST)
+    participant Ctrl as activityController.postReservation
+    participant Svc as inscriptionService.reserveClass
+    participant Repo as inscriptionRepository
+    participant DB as PostgreSQL
+    participant Policy as classPolicy
+
+    Socio->>+API: POST /clases/{id}/reservas (token JWT, idUsuario)
+    API->>+Ctrl: postReservation(id, idUsuario)
+    Ctrl->>+Svc: reserveClass(idClase, idUsuario)
+    
+    Svc->>+Svc: withRegistrationTransaction (BEGIN)
+    Svc->>+Repo: lockActivityById(idClase, client)
+    Repo->>+DB: SELECT ... FOR UPDATE
+    DB-->>-Repo: clase (bloqueada)
+    Repo-->>-Svc: clase
+    
+    Svc->>+Policy: validarVentanaReserva(fechaInicio, now)
+    Policy-->>-Svc: OK (dentro de 48h previas)
+    
+    Svc->>+Repo: requireEligibleMember(idUsuario, client)
+    Repo->>+DB: hasActiveMembership
+    DB-->>-Repo: true
+    Repo-->>-Svc: true
+    
+    Svc->>+Svc: verificarSinBloqueoPorCancelaciónTardía(idUsuario, client)
+    Svc->>+Repo: findUltimaCancelacionTardía(idUsuario, client)
+    Repo->>+DB: SELECT fecha_cancelacion WHERE estado='cancelado_tarde'
+    DB-->>-Repo: fecha_cancelacion o null
+    Repo-->>-Svc: última cancelación tardía
+    alt cancelación tardía vigente (ahora < fechaFinBloqueo)
+        Svc-->>-Svc: throw BusinessError 409 (bloqueado)
+    else sin cancelación tardía vigente
+        Svc->>+Repo: findActiveByUserAndClass(idClase, idUsuario, client)
+        Repo->>+DB: SELECT ... WHERE estado IN ('confirmado','en espera','notificado')
+        DB-->>-Repo: null (no hay activa)
+        Repo-->>-Svc: null
+        
+        Svc->>+Repo: offerAvailablePlaces (promover lista de espera si hay cupos)
+        Svc->>+Repo: countConfirmed(idClase, client)
+        Repo->>+DB: COUNT confirmados
+        DB-->>-Repo: confirmados
+        Repo-->>-Svc: confirmados
+        
+        Svc->>+Policy: validarCapacidadParaReserva(cupo, confirmados)
+        Policy-->>-Svc: OK (hay cupo)
+        
+        Svc->>+Repo: insertInscription({idClase, idUsuario, estado:'confirmado'}, client)
+        Repo->>+DB: INSERT INTO inscripciones_clase_grupal
+        DB-->>-Repo: inscripción creada
+        Repo-->>-Svc: inscripción
+    end
+    Svc->>+Repo: COMMIT
+    Repo->>+DB: COMMIT
+    DB-->>-Repo: OK
+    Repo-->>-Svc: COMMIT OK
+    Svc-->>-Ctrl: inscripción confirmada
+    Ctrl-->>-API: 201 Reserva confirmada
+    API-->>-Socio: 201 Reserva confirmada

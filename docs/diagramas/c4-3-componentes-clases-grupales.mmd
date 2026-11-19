@@ -1,0 +1,53 @@
+﻿%% Autor: Acosta, Marcela
+%% Fecha: 2026-11-18
+%% Versión: 1.2
+%%
+C4Component
+    title C4-3 Componentes — Módulo M3 Clases Grupales
+
+    Person(socio, "Socio", "Reserva clases, consulta la agenda y acepta ofertas de lista de espera")
+    Person(recepcionista, "Recepcionista", "Gestiona las clases de la sede que tiene asignada")
+    Person(gerente, "Gerente central", "Gestiona las clases de cualquier sede")
+
+    Container_Boundary(api, "API Backend — Node.js + Express", "REST JSON sobre HTTPS") {
+        Component(routes, "activityRoutes.js", "Express Router", "Define los endpoints y aplica autorizacion por rol y sede")
+        Component(controller, "activityController.js", "Controlador", "Recibe la peticion HTTP, valida y delega en el servicio")
+        Component(activityService, "activityService.js", "Servicio", "CRUD de clases grupales y control por rol y sede")
+        Component(inscriptionService, "inscriptionService.js", "Servicio", "Reservas, cancelaciones, lista de espera, ofertas y penalidad")
+        Component(classPolicy, "classPolicy.js", "Dominio", "Politicas puras: ventanas de tiempo, capacidad y cancelacion tardia")
+        Component(activityRepo, "activityRepository.js", "Repositorio", "Acceso a datos de clase_grupal")
+        Component(inscriptionRepo, "inscriptionRepository.js", "Repositorio", "Acceso a datos de inscripciones_clase_grupal")
+        Component(membershipRepo, "membershipRepository.js", "Repositorio", "Verifica membresia activa y gestiona la elegibilidad")
+        Component(notificationRepo, "notificationRepository.js", "Repositorio", "Acceso a datos de notificaciones_clase_grupal")
+        Component(notificationService, "notificationService.js", "Servicio", "Caso de uso de notificaciones: listar y marcar como leida")
+        Component(waitlistSubject, "waitlistObserver.js", "Observer", "Distribuye la oferta de lista de espera a los observadores")
+    }
+
+    ContainerDb(bd, "PostgreSQL", "SQL", "clase_grupal, inscripciones_clase_grupal, notificaciones_clase_grupal")
+
+    Rel(socio, routes, "Reserva, cancela y acepta ofertas", "HTTPS JSON")
+    Rel(recepcionista, routes, "Gestiona las clases de su sede", "HTTPS JSON")
+    Rel(gerente, routes, "Gestiona las clases de todas las sedes", "HTTPS JSON")
+
+    Rel(routes, controller, "Invoca")
+    Rel(controller, activityService, "CRUD de clases")
+    Rel(controller, inscriptionService, "Reservas, cancelaciones y lista de espera")
+    Rel(inscriptionService, classPolicy, "Consulta las politicas")
+    Rel(inscriptionService, inscriptionRepo, "Lee y escribe inscripciones")
+    Rel(inscriptionService, membershipRepo, "Valida la membresia")
+    Rel(inscriptionService, waitlistSubject, "Notifica la oferta")
+    Rel(waitlistSubject, notificationRepo, "Persiste la notificacion en la transaccion")
+    Rel(controller, notificationService, "Lista y marca notificaciones")
+    Rel(notificationService, notificationRepo, "Lee y actualiza notificaciones")
+    Rel(activityService, activityRepo, "Lee y escribe clases")
+
+    Rel(activityRepo, bd, "SQL", "pg Pool")
+    Rel(inscriptionRepo, bd, "SQL", "pg Pool")
+    Rel(membershipRepo, bd, "SQL", "pg Pool")
+    Rel(notificationRepo, bd, "SQL", "pg Pool")
+
+    UpdateRelStyle(socio, routes, "offsetY 10")
+    UpdateRelStyle(recepcionista, routes, "offsetY -10")
+    UpdateRelStyle(gerente, routes, "offsetY -30")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="true")

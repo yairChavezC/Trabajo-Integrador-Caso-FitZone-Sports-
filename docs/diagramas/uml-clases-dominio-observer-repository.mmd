@@ -1,0 +1,102 @@
+﻿%% Autor: Acosta, Marcela
+%% Fecha: 2026-11-17
+%% Versión: 1.0
+%%
+classDiagram
+    class ClaseGrupal {
+        +int id
+        +int idSede
+        +string nombre
+        +string profesor
+        +int cupo
+        +datetime fechaInicio
+        +datetime fechaFin
+        +int cupoDisponible
+        +bool tieneInscripciones
+    }
+
+    class Inscripcion {
+        +int id
+        +int idClase
+        +int idUsuario
+        +string estado
+        +datetime fechaRegistro
+        +datetime fechaExpiracionOferta
+        +datetime fechaCancelacion
+    }
+
+    class Notificacion {
+        +int id
+        +int idUsuario
+        +string tipo
+        +string mensaje
+        +int idClase
+        +int idInscripcion
+        +datetime creadaAt
+        +datetime leidaAt
+    }
+
+    class WaitlistSubject {
+        +observeres: Observer[]
+        +subscribe(observer) void
+        +unsubscribe(observer) void
+        +notify(evento, transactionClient) void
+    }
+
+    class Observer {
+        <<interface>>
+        +update(evento, transactionClient) void
+    }
+
+    class NotificationPersistenceObserver {
+        +notificationRepo
+        +transactional: true
+        +update(evento, transactionClient) void
+    }
+
+    class ConsoleWaitlistObserver {
+        +update(evento) void
+    }
+
+    class ActivityRepository {
+        +findAllActivities(idSede, incluirPasadas) ClaseGrupal[]
+        +findActivityById(id, idUsuario) ClaseGrupal
+        +lockActivityById(id, client) ClaseGrupal
+        +createActivity(dto) ClaseGrupal
+        +updateActivity(id, dto) ClaseGrupal
+        +deleteActivity(id) void
+    }
+
+    class InscriptionRepository {
+        +findActiveByUserAndClass(idClase, idUsuario) Inscripcion
+        +countConfirmed(idClase) int
+        +insertInscription(data) Inscripcion
+        +cancelInscription(id, estado, fechaCancelacion) Inscripcion
+        +findUltimaCancelacionTardia(idUsuario) Inscripcion
+        +offerAvailablePlaces(idClase) void
+        +promoteWaitlistInscription(idInscripcion) void
+        +acceptWaitlistOffer(idClase, idUsuario) Inscripcion
+        +expireWaitlistOffers() void
+    }
+
+    class MembershipRepository {
+        +requireEligibleMember(idUsuario) void
+        +hasActiveMembership(idUsuario) bool
+    }
+
+    class NotificationRepository {
+        +findByUser(idUsuario) Notificacion[]
+        +markAsRead(idNotificacion, idUsuario) Notificacion
+        +createWaitlistPromotion(evento, client) void
+    }
+
+    ClaseGrupal "1" --> "0..*" Inscripcion : tiene
+    Inscripcion "1" --> "0..1" Notificacion : genera
+    WaitlistSubject --> Observer : notifica a
+    Observer <|-- NotificationPersistenceObserver
+    Observer <|-- ConsoleWaitlistObserver
+    NotificationPersistenceObserver --> NotificationRepository : usa
+    ActivityRepository --> ClaseGrupal : gestiona
+    InscriptionRepository --> Inscripcion : gestiona
+    MembershipRepository --> Inscripcion : valida
+    WaitlistSubject --> NotificationPersistenceObserver : subscribe

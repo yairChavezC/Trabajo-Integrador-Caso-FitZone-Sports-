@@ -1,0 +1,56 @@
+﻿erDiagram
+    SEDE ||--o{ CLASE_GRUPAL : "tiene"
+    CLASE_GRUPAL ||--o{ INSCRIPCIONES_CLASE_GRUPAL : "recibe"
+    USUARIO ||--o{ INSCRIPCIONES_CLASE_GRUPAL : "realiza"
+    INSCRIPCIONES_CLASE_GRUPAL ||--o{ NOTIFICACIONES_CLASE_GRUPAL : "genera"
+    USUARIO ||--o{ NOTIFICACIONES_CLASE_GRUPAL : "recibe"
+
+    SEDE {
+        bigint id PK
+        varchar nombre
+        varchar provincia
+        varchar ciudad
+        int cupo
+        boolean activa
+    }
+
+    CLASE_GRUPAL {
+        bigint id PK
+        bigint id_sede FK
+        varchar nombre
+        varchar profesor
+        int cupo
+        timestamp fecha_inicio
+        timestamp fecha_fin
+    }
+
+    INSCRIPCIONES_CLASE_GRUPAL {
+        bigint id PK
+        bigint id_clase_grupal FK
+        bigint id_usuario FK
+        varchar estado
+        timestamp fecha_registro
+        timestamp fecha_expiracion_oferta
+        timestamp fecha_cancelacion
+    }
+
+    NOTIFICACIONES_CLASE_GRUPAL {
+        bigint id PK
+        bigint id_usuario FK
+        varchar tipo
+        text mensaje
+        bigint id_clase_grupal FK
+        bigint id_inscripcion FK
+        timestamp creada_at
+        timestamp leida_at
+    }
+
+    USUARIO {
+        bigint id PK
+        varchar dni
+        varchar nombre
+        varchar contacto
+        text password
+        bigint id_rol FK
+        boolean activo
+    }
