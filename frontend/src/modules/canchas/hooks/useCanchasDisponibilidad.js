@@ -6,23 +6,30 @@ export function useCanchasDisponibilidad(idSede, fecha) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(null);
 
-  const cargarGrilla = useCallback(async () => {
-    if (!idSede) return;
+  const cargarGrilla = useCallback(
+    async ({ forzarRecarga = false } = {}) => {
+      if (!idSede) return;
 
-    setCargando(true);
-    setError(null);
-    try {
-      const json = await obtenerDisponibilidadCanchas({ idSede, fecha });
-      if (json && json.success) {
-        setCanchas(json.data || []);
+      setCargando(true);
+      setError(null);
+      try {
+        const json = await obtenerDisponibilidadCanchas({
+          idSede,
+          fecha,
+          forzarRecarga,
+        });
+        if (json && json.success) {
+          setCanchas(json.data || []);
+        }
+      } catch (err) {
+        console.error('Error cargando canchas:', err.message || err);
+        setError(err.message || 'Error al obtener disponibilidad');
+      } finally {
+        setCargando(false);
       }
-    } catch (err) {
-      console.error('Error cargando canchas:', err.message || err);
-      setError(err.message || 'Error al obtener disponibilidad');
-    } finally {
-      setCargando(false);
-    }
-  }, [idSede, fecha]);
+    },
+    [idSede, fecha]
+  );
 
   useEffect(() => {
     cargarGrilla();
