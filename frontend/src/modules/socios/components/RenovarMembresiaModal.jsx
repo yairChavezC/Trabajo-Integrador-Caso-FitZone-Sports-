@@ -51,7 +51,7 @@ export default function RenovarMembresiaModal({ socio, onClose, onRenovado }) {
     setError(null);
 
     const userId = Number(socio?.id);
-    const monto = planSeleccionado ? Number(planSeleccionado.precio) : 0;
+    const monto = planSeleccionado ? Number(planSeleccionado.precioFinal ?? planSeleccionado.precio) : 0;
 
     try {
       const data = await renovarMembresia(userId, {
@@ -103,7 +103,7 @@ export default function RenovarMembresiaModal({ socio, onClose, onRenovado }) {
             <select id="plan-elegido" value={idPlan} onChange={(e) => setIdPlan(e.target.value)} required disabled={paying}>
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.nombre} — {FORMATO_PRECIO.format(plan.precio)}
+                  {plan.nombre} — {FORMATO_PRECIO.format(plan.precioFinal ?? plan.precio)}
                 </option>
               ))}
             </select>
@@ -132,7 +132,7 @@ export default function RenovarMembresiaModal({ socio, onClose, onRenovado }) {
 
           {planSeleccionado && (
             <p style={{ margin: '10px 0 0', fontWeight: 600 }}>
-              Total a pagar: {FORMATO_PRECIO.format(planSeleccionado.precio)}
+              Total a pagar: {FORMATO_PRECIO.format(planSeleccionado.precioFinal ?? planSeleccionado.precio)}
             </p>
           )}
 

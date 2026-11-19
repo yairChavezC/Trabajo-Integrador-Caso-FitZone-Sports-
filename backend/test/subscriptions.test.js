@@ -16,8 +16,8 @@ test('Subscriptions Service - Rechazar renovación si el pago falla', async () =
   };
 
   let poolQueryCalled = false;
-  const pool = { 
-    query: async () => { poolQueryCalled = true; } 
+  const pool = {
+    query: async () => { poolQueryCalled = true; }
   };
 
   const service = createSubscriptionsService({
@@ -40,21 +40,22 @@ test('Subscriptions Service - Procesar pago y actualizar suscripción correctame
   };
 
   const suscripcionEsperada = { id: 5, id_usuario: 10, id_plan: 1, estado: 'activa' };
+  let vincularPagoCount = 0;
   const subscriptionsRepository = {
     findByUsuario: async () => null,
-    upsert: async () => suscripcionEsperada
+    upsert: async () => suscripcionEsperada,
+    vincularPago: async () => {
+      vincularPagoCount++;
+      return {};
+    }
   };
 
   const paymentService = {
     processPayment: async () => ({ success: true, message: 'Pago aprobado', payment: { id: 123 } })
   };
 
-  let poolQueryCount = 0;
   const pool = {
-    query: async () => {
-      poolQueryCount++;
-      return { rowCount: 1 };
-    }
+    query: async () => ({ rowCount: 1 })
   };
 
   const service = createSubscriptionsService({
@@ -68,5 +69,5 @@ test('Subscriptions Service - Procesar pago y actualizar suscripción correctame
 
   assert.strictEqual(resultado.pagoAprobado, true);
   assert.deepStrictEqual(resultado.suscripcion, suscripcionEsperada);
-  assert.strictEqual(poolQueryCount, 1);
+  assert.strictEqual(vincularPagoCount, 1);
 });

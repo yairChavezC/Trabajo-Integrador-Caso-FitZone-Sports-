@@ -24,9 +24,11 @@ export const pricingStrategies = {
 
 // Función selector o Contexto para obtener la estrategia correcta
 export function obtenerEstrategiaDePrecio(tipoPlan) {
-  const estrategia = pricingStrategies[tipoPlan.toUpperCase()];
+  const estrategia = pricingStrategies[String(tipoPlan || 'REGULAR').toUpperCase()];
   if (!estrategia) {
     throw new Error(`Tipo de plan no soportado: ${tipoPlan}`);
   }
-  return estrategia;
+  return {
+    calcular: (precioBase) => Math.round(estrategia.calcular(precioBase) * 100) / 100,
+  };
 }

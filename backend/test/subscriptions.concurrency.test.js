@@ -10,10 +10,12 @@ test('Concurrencia - 5 renovaciones simultáneas para el mismo usuario procesan 
     findById: async () => ({ id: 1, nombre: 'Gold', precio: 500, activo: true, duracion_dias: 30 }),
   };
 
-  const subscriptionsRepository = {
+ const subscriptionsRepository = {
     findByUsuario: async () => null,
     upsert: async () => ({ id: 10, id_usuario: 1, id_plan: 1, estado: 'activa' }),
+    vincularPago: async () => ({}),
   };
+  
 
   // Simulamos control de concurrencia / lock lógico en el pago
   const paymentService = {

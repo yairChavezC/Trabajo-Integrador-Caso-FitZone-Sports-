@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import './UserProfileCard.css';
@@ -39,11 +39,6 @@ export function UserProfileCard({ onLogout }) {
         </button>
       )}
 
-      {/* Notificaciones */}
-      <div className="btn-notificaciones-badge">
-        <span className="notif-bell">🔔</span>
-        <span className="notif-count">1</span>
-      </div>
 
       {/* Tarjeta del perfil */}
       <div className="user-profile-card">

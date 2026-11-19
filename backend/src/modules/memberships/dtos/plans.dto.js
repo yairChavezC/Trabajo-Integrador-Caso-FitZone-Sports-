@@ -1,3 +1,5 @@
+import { obtenerEstrategiaDePrecio } from '../domain/pricingStrategies.js';
+
 // Limpia lo que llega del cliente al crear un plan
 export function toCreatePlanDTO(body) {
   return {
@@ -17,10 +19,14 @@ export function toUpdatePlanDTO(body) {
 
 // Define qué datos salen hacia el cliente
 export function toPlanResponseDTO(plan) {
+  const tipo = plan.tipo || 'REGULAR';
+  const precio = Number(plan.precio);
   return {
     id: plan.id,
     nombre: plan.nombre,
-    precio: Number(plan.precio),
+    precio,
+    tipo,
+    precioFinal: obtenerEstrategiaDePrecio(tipo).calcular(precio),
     intervalo: plan.intervalo,
     duracionDias: plan.duracion_dias,
     activo: plan.activo,
