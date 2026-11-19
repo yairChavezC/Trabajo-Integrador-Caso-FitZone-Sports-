@@ -100,3 +100,41 @@ Mostrar en el detalle los datos personales y el estado de membresía, reutilizan
 Ninguno grave.
 
 **Commits**
+*(sin hash registrado en log)*
+
+---
+
+## Sprint 5 — Unidad III — Semana del 2026-11-02
+
+### 2026-11-04 · 3 h
+
+**Actividad**
+Implementé el módulo de Membresías (`memberships`) en el backend: administración de planes, consulta de estado de suscripción por vencimiento y flujo de renovación conectado con M5 (`paymentService`). Desarrollé además el modal `RenovarMembresiaModal.jsx`, la edición de socios, las restricciones por rol en el frontend y la descarga de comprobante.
+
+**Decisión**
+Aplicar inyección de dependencias explícita (`memberships.module.js`) para desacoplar la renovación de membresías del módulo de pagos, y deducir el estado de la suscripción (`Activo`, `Vencido`, `Suspendido`) a partir de `fecha_proximo_vencimiento` y `activo` en vez de duplicar estados en base.
+
+**Problema o bloqueo**
+En pruebas de concurrencia detecté que múltiples clics simultáneos en el botón de renovar podían disparar cobros duplicados. Se resolvió agregando `idempotencyKey` por intento en el modal y validando la serialización en `subscriptions.concurrency.test.js`.
+
+**Commits**
+`27d1123` feat(socios,membresias): renovación con pagos M5, edición de socio, restricciones por rol y descarga de comprobante
+
+---
+
+## Sprint 6 — Unidad IV — Semana del 2026-11-16
+
+### 2026-11-19 · 3.5 h
+
+**Actividad**
+Activé el patrón Strategy para el cálculo dinámico de precios por tipo de plan (`REGULAR`, `VIP`, `STUDENT`, `PROMO_ANUAL`): agregué la migración `003_add_tipo_plan.sql`, actualicé `plans.repository.js`, redondeé el cálculo a dos decimales en `pricingStrategies.js` y expuse `precioFinal` en `plans.dto.js` y en `RenovarMembresiaModal.jsx`. Encapsulé la vinculación de pago en `subscriptionsRepository.vincularPago` y sumé pruebas unitarias en `pricingStrategies.test.js`. También completé el `MANUAL_TECNICO.md` (incluyendo los diagramas C4 y la guía de extensión) y actualicé la documentación en `docs/manuales/`.
+
+**Decisión**
+Mover la consulta `UPDATE pagos` desde `subscriptions.service.js` hacia `subscriptionsRepository.vincularPago` para respetar la separación de capas (que el servicio no ejecute SQL directo) y calcular `precioFinal` en el DTO del servidor para garantizar que el monto mostrado en el modal coincida exactamente con el cobrado.
+
+**Problema o bloqueo**
+Al mover la vinculación de pago al repositorio fallaron `subscriptions.test.js` y `subscriptions.concurrency.test.js` porque los mocks no incluían `vincularPago` y seguían contando llamadas a `pool.query`. Actualicé ambos tests para mockear el nuevo método del repositorio y luego integré los cambios de `origin/main` en `feature/usuarios-membresias-pagos` verificando la suite completa.
+
+**Commits**
+`974b3b0` feat(memberships): estrategias de precio por plan, vinculacion de pagos y manuales
+`ae48f96` Merge remote-tracking branch 'origin/main' into feature/usuarios-membresias-pagos
