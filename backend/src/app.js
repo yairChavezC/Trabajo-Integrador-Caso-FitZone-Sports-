@@ -1,9 +1,14 @@
+import { createRequire } from 'module';
 import express from 'express';
 import helmet from 'helmet';
-import corsmiddleware from './core/middlewares/cors.js'; // o desde './config/cors.js'
+import swaggerUi from 'swagger-ui-express';
+import corsmiddleware from './core/middlewares/cors.js';
 import apiRouter from './appRouter.js';
 import notFoundHandler from './core/errors/notFoundHandler.js';
 import errorHandler from './core/errors/errorHandler.js';
+
+const require = createRequire(import.meta.url);
+const swaggerDocument = require('../swagger.json');
 
 const app = express();
 
@@ -13,13 +18,19 @@ app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 2. Rutas de la API
+// 2. Documentación OpenAPI / Swagger
+app.use(
+  '/api-docs',
+  helmet({ contentSecurityPolicy: false }),
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument)
+);
+
+// 3. Rutas de la API
 app.use('/api', apiRouter);
 
-// 3. Manejo de rutas inexistentes (404)
+// 4. Manejo de rutas inexistentes (404) y errores (500)
 app.use(notFoundHandler);
-
-// 4. Manejador centralizado de errores (500)
 app.use(errorHandler);
 
 export default app;
