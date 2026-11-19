@@ -8,9 +8,9 @@ RUN npm ci
 
 COPY . .
 
-# Vite incrusta VITE_API_URL en el bundle al momento de compilar
-ARG VITE_API_URL=http://localhost:3000/api/
-ENV VITE_API_URL=$VITE_API_URL
+# Vite incrusta VITE_API_BASE_URL en el bundle al momento de compilar
+ARG VITE_API_BASE_URL=http://localhost:3000/api/
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build
 
