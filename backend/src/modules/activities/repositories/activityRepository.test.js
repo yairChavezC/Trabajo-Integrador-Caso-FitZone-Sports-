@@ -24,7 +24,6 @@ test('activityRepository usa sus consultas y clientes de transacción', async (t
 
   await activityRepository.findAllActivities(5, 4);
   await activityRepository.findActivityById(8, 5);
-  await activityRepository.findMyRegistrations(5);
   assert.equal(await activityRepository.findRoleTypeById(3), 'socio');
   assert.equal(await activityRepository.findAssignedSiteByUser(5), 4);
   assert.deepEqual(await activityRepository.findClassesWithExpiredOffers(), [8]);
@@ -47,7 +46,11 @@ test('activityRepository usa sus consultas y clientes de transacción', async (t
   }, client);
   await activityRepository.deleteActivity(8, client);
 
-  assert.ok(llamadas.length >= 7);
+  assert.ok(llamadas.length >= 6);
   assert.equal(clientLlamadas.length, 3);
-  assert.match(llamadas[0].sql, /c\.fecha_fin >= NOW\(\)/);
+  assert.match(llamadas[0].sql, /c\.fecha_fin >= \(NOW\(\) AT TIME ZONE 'America\/Argentina\/Buenos_Aires'\)/);
+  assert.match(llamadas[0].sql, /COUNT\(\*\) AS total/);
+  assert.match(llamadas[0].sql, /AS "tieneInscripciones"/);
+  assert.match(llamadas[0].sql, /c\.fecha_inicio AT TIME ZONE 'America\/Argentina\/Buenos_Aires' AS "fechaInicio"/);
+  assert.match(clientLlamadas[1].sql, /fecha_inicio = \$5::timestamptz AT TIME ZONE 'America\/Argentina\/Buenos_Aires'/);
 });

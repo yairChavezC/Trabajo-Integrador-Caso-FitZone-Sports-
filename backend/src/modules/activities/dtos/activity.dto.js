@@ -136,6 +136,3 @@ export class UpdateActivityDTO {
         return errors;
     }
 }
-
-// compatibilidad temporal
-export { CreateActivityDTO as CreateClassDTO };

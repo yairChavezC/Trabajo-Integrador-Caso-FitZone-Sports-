@@ -29,12 +29,22 @@ export const validarVentanaListaEspera = (fechaInicio, ahora = Date.now()) => {
 };
 
 export const validarVentanaCancelacion = (fechaInicio, ahora = Date.now()) => {
-  if (horasHastaInicio(fechaInicio, ahora) < HORAS_LIMITE_CANCELACION) {
+  const horasRestantes = horasHastaInicio(fechaInicio, ahora);
+  if (horasRestantes <= 0) {
     throw new BusinessError(
-      `Solo se puede cancelar hasta ${HORAS_LIMITE_CANCELACION} horas antes del inicio.`,
+      'No se puede cancelar una inscripción después de que comienza la clase.',
       409
     );
   }
+};
+
+/**
+ * Devuelve true si la cancelación es tardía: menos de 2 horas antes del inicio
+ * pero la clase aún no comenzó.
+ */
+export const esCancelacionTardia = (fechaInicio, ahora = Date.now()) => {
+  const horasRestantes = horasHastaInicio(fechaInicio, ahora);
+  return horasRestantes > 0 && horasRestantes < HORAS_LIMITE_CANCELACION;
 };
 
 export const validarCapacidadParaReserva = (cupo, confirmados) => {
@@ -93,8 +103,7 @@ export const calcularAccionesClase = (clase, ahora = Date.now()) => {
     ),
     puedeCancelar: Boolean(
       miInscripcion &&
-      horasRestantes > 0 &&
-      (miInscripcion.estado !== 'confirmado' || horasRestantes >= HORAS_LIMITE_CANCELACION)
+      horasRestantes > 0
     )
   };
 };

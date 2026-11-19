@@ -1,13 +1,15 @@
 import pool from '../../../config/db.js';
 
+const argentinaTimeZone = 'America/Argentina/Buenos_Aires';
+
 const classColumns = `
   id,
   id_sede AS "idSede",
   nombre,
   profesor,
   cupo,
-  fecha_inicio AS "fechaInicio",
-  fecha_fin AS "fechaFin"
+  fecha_inicio AT TIME ZONE '${argentinaTimeZone}' AS "fechaInicio",
+  fecha_fin AT TIME ZONE '${argentinaTimeZone}' AS "fechaFin"
 `;
 
 const classSelect = `
@@ -17,8 +19,9 @@ const classSelect = `
   c.profesor,
   c.cupo,
   s.nombre AS "sede",
-  c.fecha_inicio AS "fechaInicio",
-  c.fecha_fin AS "fechaFin",
+  c.fecha_inicio AT TIME ZONE '${argentinaTimeZone}' AS "fechaInicio",
+  c.fecha_fin AT TIME ZONE '${argentinaTimeZone}' AS "fechaFin",
+  COALESCE(inscriptos.total, 0)::int > 0 AS "tieneInscripciones",
   COALESCE(inscriptos.confirmados, 0)::int AS "inscriptosConfirmados",
   GREATEST(c.cupo - COALESCE(inscriptos.confirmados, 0), 0)::int AS "cupoDisponible",
   mi.inscripcion AS "miInscripcion"
@@ -28,13 +31,15 @@ const activityJoins = `
   LEFT JOIN (
     SELECT
       id_clase_grupal,
-      COUNT(*) AS confirmados
+      COUNT(*) AS total,
+      COUNT(*) FILTER (
+        WHERE estado = 'confirmado'
+          OR (
+            estado = 'notificado'
+            AND fecha_expiracion_oferta > NOW()
+          )
+      ) AS confirmados
     FROM public.inscripciones_clase_grupal
-    WHERE estado = 'confirmado'
-      OR (
-        estado = 'notificado'
-        AND fecha_expiracion_oferta > NOW()
-      )
     GROUP BY id_clase_grupal
   ) inscriptos ON inscriptos.id_clase_grupal = c.id
   LEFT JOIN public.sede s ON s.id = c.id_sede
@@ -57,19 +62,35 @@ const activityJoins = `
   ) mi ON TRUE
 `;
 
-export const findAllActivities = async (idUsuario = null, idSede = null, incluirPasadas = false) => {
-  const query = `
+export const findAllActivities = async (idUsuario = null, idSede = null, incluirPasadas = false, limit = null, offset = null) => {
+  let query = `
     SELECT
       ${classSelect}
     FROM public.clase_grupal c
     ${activityJoins}
     WHERE ($2::bigint IS NULL OR c.id_sede = $2)
-      AND ($3::boolean OR c.fecha_fin >= NOW())
-    ORDER BY c.fecha_inicio ASC;
+      AND (
+        $3::boolean
+        OR c.fecha_fin >= (NOW() AT TIME ZONE '${argentinaTimeZone}')
+      )
+    ORDER BY c.fecha_inicio ASC
   `;
 
+  const values = [idUsuario, idSede, incluirPasadas];
+  let paramIndex = 4;
+
+  if (limit !== null && Number.isInteger(Number(limit)) && Number(limit) > 0) {
+    query += ` LIMIT $${paramIndex++}`;
+    values.push(Number(limit));
+  }
+  if (offset !== null && Number.isInteger(Number(offset)) && Number(offset) >= 0) {
+    query += ` OFFSET $${paramIndex++}`;
+    values.push(Number(offset));
+  }
+  query += ';';
+
   try {
-    const { rows } = await pool.query(query, [idUsuario, idSede, incluirPasadas]);
+    const { rows } = await pool.query(query, values);
     return rows;
   } catch (error) {
     console.error('Error en activityRepository.findAllActivities:', error);
@@ -92,37 +113,6 @@ export const findActivityById = async (id, idUsuario = null, client = pool) => {
     return rows[0];
   } catch (error) {
     console.error('Error en activityRepository.findActivityById:', error);
-    throw error;
-  }
-};
-
-export const findMyRegistrations = async (idUsuario) => {
-  const query = `
-    SELECT
-      i.id AS "idInscripcion",
-      c.id AS "idClase",
-      c.nombre AS "nombreClase",
-      s.nombre AS "sede",
-      c.profesor AS "instructor",
-      c.fecha_inicio AS "fechaInicio",
-      c.fecha_fin AS "fechaFin",
-      i.estado,
-      i.fecha_expiracion_oferta AS "fechaExpiracionOferta"
-    FROM public.inscripciones_clase_grupal i
-    INNER JOIN public.clase_grupal c ON c.id = i.id_clase_grupal
-    INNER JOIN public.sede s ON s.id = c.id_sede
-    WHERE i.id_usuario = $1
-      AND i.estado IN ('confirmado', 'en espera', 'notificado')
-      AND (i.estado <> 'notificado' OR i.fecha_expiracion_oferta > NOW())
-      AND c.fecha_inicio > NOW()
-    ORDER BY c.fecha_inicio ASC, i.id ASC;
-  `;
-
-  try {
-    const { rows } = await pool.query(query, [idUsuario]);
-    return rows;
-  } catch (error) {
-    console.error('Error en activityRepository.findMyRegistrations:', error);
     throw error;
   }
 };
@@ -167,8 +157,8 @@ export const lockActivityById = async (id, client) => {
       c.nombre,
       c.profesor,
       c.cupo,
-      c.fecha_inicio AS "fechaInicio",
-      c.fecha_fin AS "fechaFin"
+      c.fecha_inicio AT TIME ZONE '${argentinaTimeZone}' AS "fechaInicio",
+      c.fecha_fin AT TIME ZONE '${argentinaTimeZone}' AS "fechaFin"
     FROM public.clase_grupal c
     WHERE c.id = $1
     FOR UPDATE;
@@ -193,7 +183,14 @@ export const createActivity = async (dto) => {
       fecha_inicio,
       fecha_fin
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5::timestamptz AT TIME ZONE '${argentinaTimeZone}',
+      $6::timestamptz AT TIME ZONE '${argentinaTimeZone}'
+    )
     RETURNING
       ${classColumns};
   `;
@@ -224,8 +221,8 @@ export const updateActivity = async (id, dto, client = pool) => {
       nombre = $2,
       profesor = $3,
       cupo = $4,
-      fecha_inicio = $5,
-      fecha_fin = $6
+      fecha_inicio = $5::timestamptz AT TIME ZONE '${argentinaTimeZone}',
+      fecha_fin = $6::timestamptz AT TIME ZONE '${argentinaTimeZone}'
     WHERE id = $7
     RETURNING
       ${classColumns};

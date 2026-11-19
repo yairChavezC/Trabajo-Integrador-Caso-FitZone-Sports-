@@ -4,6 +4,7 @@ import {
   validarVentanaReserva,
   validarVentanaListaEspera,
   validarVentanaCancelacion,
+  esCancelacionTardia,
   validarCapacidadParaReserva,
   validarCapacidadParaListaEspera,
   validarReduccionDeCupo,
@@ -34,12 +35,24 @@ test('la lista de espera permanece abierta hasta el inicio de la clase', () => {
   assert.throws(() => validarVentanaListaEspera(horasDesdeAhora(-1), AHORA), { status: 409 });
 });
 
-test('cancelación admite exactamente 2 horas y rechaza menos', () => {
+test('cancelación permite hasta el inicio; menos de 2 h es tardía, no se rechaza', () => {
   assert.doesNotThrow(() => validarVentanaCancelacion(horasDesdeAhora(2), AHORA));
+  assert.doesNotThrow(() => validarVentanaCancelacion(horasDesdeAhora(1.99), AHORA));
+  assert.doesNotThrow(() => validarVentanaCancelacion(horasDesdeAhora(0.01), AHORA));
+  assert.throws(() => validarVentanaCancelacion(horasDesdeAhora(0), AHORA), { status: 409 });
   assert.throws(
-    () => validarVentanaCancelacion(horasDesdeAhora(1.99), AHORA),
+    () => validarVentanaCancelacion(horasDesdeAhora(-1), AHORA),
     { status: 409 }
   );
+});
+
+test('esCancelacionTardia detecta menos de 2 h antes del inicio', () => {
+  assert.equal(esCancelacionTardia(horasDesdeAhora(2), AHORA), false);
+  assert.equal(esCancelacionTardia(horasDesdeAhora(1.99), AHORA), true);
+  assert.equal(esCancelacionTardia(horasDesdeAhora(0.01), AHORA), true);
+  assert.equal(esCancelacionTardia(horasDesdeAhora(0), AHORA), false);
+  assert.equal(esCancelacionTardia(horasDesdeAhora(-1), AHORA), false);
+  assert.equal(esCancelacionTardia(horasDesdeAhora(24), AHORA), false);
 });
 
 test('las ventanas rechazan fechas de inicio inválidas', () => {
@@ -106,7 +119,14 @@ test('calcula acciones según horario, capacidad e inscripción propia', () => {
       { ...clase, fechaInicio: horasDesdeAhora(1), miInscripcion: { estado: 'confirmado' } },
       AHORA
     ).puedeCancelar,
-    false
+    true
+  );
+  assert.equal(
+    calcularAccionesClase(
+      { ...clase, fechaInicio: horasDesdeAhora(1.99), miInscripcion: { estado: 'confirmado' } },
+      AHORA
+    ).puedeCancelar,
+    true
   );
   assert.equal(
     calcularAccionesClase(
