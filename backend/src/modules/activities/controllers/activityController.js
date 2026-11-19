@@ -4,15 +4,16 @@ import {
   createActivity as createActivityService,
   updateActivity as updateActivityService,
   deleteActivity as deleteActivityService,
+  getCurrentUserRole,
+  getAssignedSiteForUser
+} from '../services/activityService.js';
+import {
   reserveClass,
   joinWaitlist,
   cancelClassReservation,
   getInscriptionsByClass,
-  getMyUpcomingRegistrations,
-  getCurrentUserRole,
-  getAssignedSiteForUser,
   acceptWaitlistOfferForUser
-} from '../services/activityService.js';
+} from '../services/inscriptionService.js';
 
 import { CreateActivityDTO, UpdateActivityDTO } from '../dtos/activity.dto.js';
 import { BusinessError } from '../errors.js';
@@ -37,16 +38,20 @@ const getUserId = (req) => {
   return Number.isInteger(id) && id > 0 ? id : null;
 };
 
-export const getActivities = async (req, res) => {
+export const createGetActivitiesController = ({
+  getCurrentUserRole: resolveRole = getCurrentUserRole,
+  getAssignedSiteForUser: findAssignedSite = getAssignedSiteForUser,
+  getAllActivities: listActivities = getAllActivities
+} = {}) => async (req, res) => {
   try {
-    const tipo = await getCurrentUserRole(req.usuario?.rol);
+    const tipo = await resolveRole(req.usuario?.rol);
     let idSede = null;
     const incluirPasadas =
       req.query.incluirPasadas === 'true' &&
       tipo === 'gerente';
 
     if (tipo === 'recepcionista') {
-      idSede = await getAssignedSiteForUser(getUserId(req));
+      idSede = await findAssignedSite(getUserId(req));
       if (!idSede) {
         return res.status(403).json({ message: 'Tu perfil no tiene una sede asignada.' });
       }
@@ -57,21 +62,24 @@ export const getActivities = async (req, res) => {
       }
     }
 
-    const activities = await getAllActivities(getUserId(req), idSede, incluirPasadas);
+    let limit = null;
+    let offset = null;
+    if (req.query.limit) {
+      const parsedLimit = Number(req.query.limit);
+      if (Number.isInteger(parsedLimit) && parsedLimit > 0) limit = parsedLimit;
+    }
+    if (req.query.offset) {
+      const parsedOffset = Number(req.query.offset);
+      if (Number.isInteger(parsedOffset) && parsedOffset >= 0) offset = parsedOffset;
+    }
+
+    const activities = await listActivities(getUserId(req), idSede, incluirPasadas, limit, offset);
     return res.status(200).json(activities);
   } catch (error) {
     return handleError(res, error, 'Error al obtener las clases:');
   }
 };
-
-export const getMyRegistrations = async (req, res) => {
-  try {
-    const registrations = await getMyUpcomingRegistrations(getUserId(req));
-    return res.status(200).json(registrations);
-  } catch (error) {
-    return handleError(res, error, 'Error al obtener mis inscripciones:');
-  }
-};
+export const getActivities = createGetActivitiesController();
 
 export const getClassNotifications = async (req, res) => {
   try {
@@ -109,7 +117,11 @@ export const getMyRole = async (req, res) => {
   }
 };
 
-export const getActivityById = async (req, res) => {
+export const createGetActivityByIdController = ({
+  getCurrentUserRole: resolveRole = getCurrentUserRole,
+  getAssignedSiteForUser: findAssignedSite = getAssignedSiteForUser,
+  getActivityById: findActivity = getActivityByIdService
+} = {}) => async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -117,15 +129,15 @@ export const getActivityById = async (req, res) => {
       return res.status(400).json({ message: 'El ID de la clase es inválido.' });
     }
 
-    const tipo = await getCurrentUserRole(req.usuario?.rol);
+    const tipo = await resolveRole(req.usuario?.rol);
     const idSede = tipo === 'recepcionista'
-      ? await getAssignedSiteForUser(getUserId(req))
+      ? await findAssignedSite(getUserId(req))
       : null;
     if (tipo === 'recepcionista' && !idSede) {
       return res.status(403).json({ message: 'Tu perfil no tiene una sede asignada.' });
     }
 
-    const activity = await getActivityByIdService(id, getUserId(req));
+    const activity = await findActivity(id, getUserId(req));
 
     if (!activity) {
       return res.status(404).json({ message: 'Clase no encontrada.' });
@@ -139,6 +151,7 @@ export const getActivityById = async (req, res) => {
     return handleError(res, error, 'Error al obtener la clase:');
   }
 };
+export const getActivityById = createGetActivityByIdController();
 
 export const createActivity = async (req, res) => {
   try {

@@ -1,7 +1,6 @@
 import express from 'express';
 import {
   getActivities,
-  getMyRegistrations,
   getMyRole,
   getActivityById,
   createActivity,
@@ -78,18 +77,20 @@ export const createRequireAgendaManager = ({
   }
 };
 
-const requireRoles = (rolesPermitidos, mensaje) => async (req, res, next) => {
-  try {
-    const tipo = await getCurrentUserRole(req.usuario?.rol);
-    if (!rolesPermitidos.includes(tipo)) {
-      return res.status(403).json({ message: mensaje });
+export const createRequireRoles = (resolveRole = getCurrentUserRole) =>
+  (rolesPermitidos, mensaje) => async (req, res, next) => {
+    try {
+      const tipo = await resolveRole(req.usuario?.rol);
+      if (!rolesPermitidos.includes(tipo)) {
+        return res.status(403).json({ message: mensaje });
+      }
+      return next();
+    } catch (error) {
+      return next(error);
     }
-    return next();
-  } catch (error) {
-    return next(error);
-  }
-};
+  };
 
+const requireRoles = createRequireRoles();
 const requireClassAccess = requireRoles(
   ['socio', 'recepcionista', 'gerente'],
   'La agenda de clases está disponible para socios y personal de FitZone.'
@@ -102,7 +103,6 @@ const requireSocio = requireRoles(
 
 router.get('/', requireClassAccess, getActivities);
 router.get('/mi-rol', getMyRole);
-router.get('/mis-inscripciones', getMyRegistrations);
 router.get('/notificaciones', requireSocio, getClassNotifications);
 router.put('/notificaciones/:id/leida', requireSocio, markClassNotificationAsRead);
 router.post('/', requireAgendaManager, createActivity);
