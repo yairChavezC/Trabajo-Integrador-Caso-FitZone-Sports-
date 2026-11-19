@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // La URL puede configurarse para despliegues con frontend y API en hosts distintos.
-const baseURL = import.meta.env?.VITE_API_URL || '/api/';
+const baseURL = import.meta.env?.VITE_API_BASE_URL || '/api/';
 
 export const httpClient = axios.create({
     baseURL,
@@ -33,13 +33,14 @@ httpClient.interceptors.response.use(
         if (error.response) {
             const status = error.response.status;
 
-            // Manejo de sesión expirada o token inválido (cubre 401 Unauthorized y 403 Forbidden)
-            if (status === 401 || status === 403) {
+            // Solo 401 (token expirado/inválido) cierra sesión y redirige al login.
+            // 403 (Forbidden) significa que el usuario no tiene permiso para esa acción,
+            // pero su sesión sigue siendo válida. Mostramos el error sin desloguear.
+            if (status === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('sedeId');
-                localStorage.removeItem('user'); // O la clave que uses para la sesión
+                localStorage.removeItem('user');
 
-                // Redirige al login únicamente si no estamos ya allí
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                 }
