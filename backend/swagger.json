@@ -3,7 +3,7 @@
   "info": {
     "title": "FitZone Sports API",
     "version": "1.0.0",
-    "description": "Contrato OpenAPI 3.0 del sistema de gestión deportiva FitZone Sports (Autenticación, Grilla de Canchas, Reservas y Módulo de Pagos M5)."
+    "description": "Contrato OpenAPI 3.0 completo del sistema de gestión deportiva FitZone Sports (Autenticación, Sedes, Accesos, Membresías, Clases Grupales, Canchas, Reservas, Usuarios y Pagos)."
   },
   "servers": [
     {
@@ -17,6 +17,18 @@
       "description": "Autenticación y emisión de tokens JWT"
     },
     {
+      "name": "Accesos",
+      "description": "Control de ingreso/egreso por QR dinámico, aforo por sede y sincronización offline (RNF-01)"
+    },
+    {
+      "name": "Membresías y Planes",
+      "description": "ABM de planes comerciales y renovación de suscripciones de socios"
+    },
+    {
+      "name": "Clases Grupales",
+      "description": "Gestión de agenda, reservas de cupos, lista de espera con ofertas temporales y notificaciones"
+    },
+    {
       "name": "Canchas",
       "description": "Consulta de disponibilidad horaria y tarifas dinámicas (Patrón Strategy)"
     },
@@ -27,6 +39,14 @@
     {
       "name": "Pagos",
       "description": "Procesamiento de pagos con pasarelas estándar (MercadoPago/MODO), idempotencia y emisión de comprobantes PDF (Patrón Builder)"
+    },
+    {
+      "name": "Usuarios",
+      "description": "Gestión de socios, clientes externos, personal e historial de pagos por usuario"
+    },
+    {
+      "name": "Sedes",
+      "description": "Consulta de sucursales deportivas"
     }
   ],
   "components": {
@@ -191,6 +211,39 @@
           "transaccionExternaId": { "type": "string", "example": "mp_ok_987654" }
         }
       },
+      "ClaseInput": {
+        "type": "object",
+        "required": ["idSede", "nombre", "profesor", "cupo", "fechaInicio", "fechaFin"],
+        "properties": {
+          "idSede": { "type": "integer", "example": 1 },
+          "nombre": { "type": "string", "example": "CrossFit WOD" },
+          "profesor": { "type": "string", "example": "Juan Pérez" },
+          "cupo": { "type": "integer", "example": 15 },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-20T18:00:00"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-20T19:00:00"
+          }
+        }
+      },
+      "PlanInput": {
+        "type": "object",
+        "required": ["nombre", "precio", "intervalo"],
+        "properties": {
+          "nombre": { "type": "string", "example": "Plan Gold" },
+          "precio": { "type": "number", "example": 25000 },
+          "intervalo": {
+            "type": "string",
+            "enum": ["mensual", "anual"],
+            "example": "mensual"
+          }
+        }
+      },
       "ErrorResponse": {
         "type": "object",
         "properties": {
@@ -239,6 +292,489 @@
               }
             }
           }
+        }
+      }
+    },
+    "/accesses/ingreso": {
+      "post": {
+        "tags": ["Accesos"],
+        "summary": "Registrar ingreso por QR dinámico (RF-04 / RN-01)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["qrCode", "idSede"],
+                "properties": {
+                  "qrCode": { "type": "string", "example": "FITZONE-10-1763228400000" },
+                  "idSede": { "type": "integer", "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ingreso autorizado o denegado con motivo" },
+          "403": { "description": "Requiere rol recepcionista (1) o gerente (4)" }
+        }
+      }
+    },
+    "/accesses/salida": {
+      "post": {
+        "tags": ["Accesos"],
+        "summary": "Registrar egreso de socio en sede",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["qrCode", "idSede"],
+                "properties": {
+                  "qrCode": { "type": "string", "example": "FITZONE-10-1763228400000" },
+                  "idSede": { "type": "integer", "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Salida registrada y aforo actualizado" },
+          "403": { "description": "Sin permisos de personal" }
+        }
+      }
+    },
+    "/accesses/scan": {
+      "post": {
+        "tags": ["Accesos"],
+        "summary": "Escaneo inteligente en molinete (detecta ingreso o salida automáticamente)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["qrCode", "idSede"],
+                "properties": {
+                  "qrCode": { "type": "string", "example": "FITZONE-10-1763228400000" },
+                  "idSede": { "type": "integer", "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Movimiento procesado" },
+          "403": { "description": "Sin permisos de personal" }
+        }
+      }
+    },
+    "/accesses/estado/{sedeId}": {
+      "get": {
+        "tags": ["Accesos"],
+        "summary": "Consultar aforo actual, cupo máximo y últimos movimientos de una sede (RF-05)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "sedeId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "example": 1 }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Estado de ocupación de la sucursal" },
+          "403": { "description": "Sin permisos de personal" }
+        }
+      }
+    },
+    "/accesses/externo": {
+      "post": {
+        "tags": ["Accesos"],
+        "summary": "Registrar ingreso manual de cliente externo por DNI",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["nombre", "dni", "sedeId"],
+                "properties": {
+                  "nombre": { "type": "string", "example": "Juan Pérez" },
+                  "dni": { "type": "string", "example": "44561234" },
+                  "sedeId": { "type": "integer", "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ingreso externo registrado" },
+          "400": { "description": "El DNI pertenece a un socio registrado" }
+        }
+      }
+    },
+    "/accesses/padron-offline": {
+      "get": {
+        "tags": ["Accesos"],
+        "summary": "Descargar padrón de socios activos para modo contingencia offline (RNF-01)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Padrón de socios y timestamp de sincronización" },
+          "403": { "description": "Sin permisos de personal" }
+        }
+      }
+    },
+    "/accesses/sincronizar-offline": {
+      "post": {
+        "tags": ["Accesos"],
+        "summary": "Sincronizar lote de accesos registrados sin conexión (RNF-01)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["eventos"],
+                "properties": {
+                  "eventos": {
+                    "type": "array",
+                    "items": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resumen de eventos procesados y errores" },
+          "403": { "description": "Sin permisos de personal" }
+        }
+      }
+    },
+    "/accesses/me/historial": {
+      "get": {
+        "tags": ["Accesos"],
+        "summary": "Consultar historial personal de ingresos y egresos del socio autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Listado de accesos del usuario" },
+          "401": { "description": "No autenticado" }
+        }
+      }
+    },
+    "/plans": {
+      "get": {
+        "tags": ["Membresías y Planes"],
+        "summary": "Listar planes de membresía",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Listado de planes disponibles" }
+        }
+      },
+      "post": {
+        "tags": ["Membresías y Planes"],
+        "summary": "Crear un nuevo plan de membresía (solo Gerente)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PlanInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Plan creado" },
+          "403": { "description": "Requiere rol gerente (4)" }
+        }
+      }
+    },
+    "/plans/{id}": {
+      "get": {
+        "tags": ["Membresías y Planes"],
+        "summary": "Obtener un plan por ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Plan encontrado" },
+          "404": { "description": "Plan no encontrado" }
+        }
+      },
+      "put": {
+        "tags": ["Membresías y Planes"],
+        "summary": "Actualizar datos de un plan (solo Gerente)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PlanInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Plan actualizado" },
+          "403": { "description": "Requiere rol gerente (4)" }
+        }
+      }
+    },
+    "/plans/{id}/activo": {
+      "patch": {
+        "tags": ["Membresías y Planes"],
+        "summary": "Activar o desactivar un plan (solo Gerente)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["activo"],
+                "properties": {
+                  "activo": { "type": "boolean", "example": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Estado del plan actualizado" },
+          "403": { "description": "Requiere rol gerente (4)" }
+        }
+      }
+    },
+    "/memberships/{idUsuario}/renovar": {
+      "post": {
+        "tags": ["Membresías y Planes"],
+        "summary": "Renovar suscripción de un socio procesando el pago",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "idUsuario", "in": "path", "required": true, "schema": { "type": "integer", "example": 10 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["idPlan"],
+                "properties": {
+                  "idPlan": { "type": "integer", "example": 1 },
+                  "metodoPago": { "type": "string", "example": "MERCADOPAGO" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resultado de la renovación y pago" }
+        }
+      }
+    },
+    "/clases": {
+      "get": {
+        "tags": ["Clases Grupales"],
+        "summary": "Listar clases grupales disponibles para la agenda",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "idSede",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "example": 1 }
+          },
+          {
+            "name": "incluirPasadas",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "boolean", "default": false }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Listado de clases filtradas por rol y sede" }
+        }
+      },
+      "post": {
+        "tags": ["Clases Grupales"],
+        "summary": "Crear una nueva clase grupal",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ClaseInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Clase creada" },
+          "400": { "description": "Datos inválidos o sede inexistente" },
+          "403": { "description": "Sin permisos sobre la sede" }
+        }
+      }
+    },
+    "/clases/mi-rol": {
+      "get": {
+        "tags": ["Clases Grupales"],
+        "summary": "Obtener rol y sede asignada del usuario autenticado en el módulo",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Perfil de permisos del módulo" }
+        }
+      }
+    },
+    "/clases/notificaciones": {
+      "get": {
+        "tags": ["Clases Grupales"],
+        "summary": "Listar notificaciones de cupos liberados del socio autenticado",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Notificaciones del socio" }
+        }
+      }
+    },
+    "/clases/notificaciones/{id}/leida": {
+      "put": {
+        "tags": ["Clases Grupales"],
+        "summary": "Marcar una notificación propia como leída",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "example": 1 }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Notificación marcada como leída" },
+          "404": { "description": "Notificación no encontrada" }
+        }
+      }
+    },
+    "/clases/{id}": {
+      "get": {
+        "tags": ["Clases Grupales"],
+        "summary": "Obtener detalle de una clase por ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Detalle de la clase" },
+          "404": { "description": "Clase no encontrada" }
+        }
+      },
+      "put": {
+        "tags": ["Clases Grupales"],
+        "summary": "Actualizar datos o cupo de una clase grupal",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ClaseInput" } } }
+        },
+        "responses": {
+          "200": { "description": "Clase actualizada" },
+          "409": { "description": "Cupo inferior a confirmados o cambio de horario con inscripciones activas" }
+        }
+      },
+      "delete": {
+        "tags": ["Clases Grupales"],
+        "summary": "Eliminar una clase sin inscripciones activas",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Clase eliminada" },
+          "409": { "description": "Tiene inscripciones activas (confirmadas, en espera o notificadas)" }
+        }
+      }
+    },
+    "/clases/{id}/inscripciones": {
+      "get": {
+        "tags": ["Clases Grupales"],
+        "summary": "Listar inscriptos de una clase (solo gerente o recepcionista de la sede)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Listado de inscripciones" },
+          "403": { "description": "Sin permisos sobre la sede" }
+        }
+      }
+    },
+    "/clases/{id}/reservas": {
+      "post": {
+        "tags": ["Clases Grupales"],
+        "summary": "Reservar un lugar en una clase grupal",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "201": { "description": "Reserva confirmada" },
+          "403": { "description": "Membresía inactiva" },
+          "409": { "description": "Cupo completo, ya inscripto o penalidad por cancelación tardía" }
+        }
+      },
+      "delete": {
+        "tags": ["Clases Grupales"],
+        "summary": "Cancelar reserva o inscripción en lista de espera",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Inscripción cancelada (y promoción del siguiente en espera si aplica)" },
+          "409": { "description": "La clase ya comenzó" }
+        }
+      }
+    },
+    "/clases/{id}/lista-espera": {
+      "post": {
+        "tags": ["Clases Grupales"],
+        "summary": "Anotarse en lista de espera cuando la clase está llena",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "201": { "description": "Anotado en lista de espera" },
+          "409": { "description": "Todavía hay cupos disponibles o penalidad vigente" }
+        }
+      }
+    },
+    "/clases/{id}/lista-espera/aceptar": {
+      "post": {
+        "tags": ["Clases Grupales"],
+        "summary": "Aceptar oferta temporal de cupo liberado en lista de espera",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Oferta aceptada y cupo confirmado" },
+          "409": { "description": "Oferta vencida o clase iniciada" }
         }
       }
     },
@@ -431,7 +967,7 @@
         }
       }
     },
-    "/pagos": {
+    "/payments": {
       "post": {
         "tags": ["Pagos"],
         "summary": "Procesar un pago mediante pasarela (MercadoPago / MODO)",
@@ -496,7 +1032,7 @@
         }
       }
     },
-    "/pagos/{id}/comprobante": {
+    "/payments/{id}/comprobante": {
       "get": {
         "tags": ["Pagos"],
         "summary": "Generar y descargar el comprobante de pago en PDF",
@@ -539,6 +1075,98 @@
               }
             }
           }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Listar usuarios del sistema (Recepcionista o Gerente)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Listado de usuarios" },
+          "403": { "description": "Requiere permisos de personal" }
+        }
+      },
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Registrar un nuevo usuario (Recepcionista o Gerente)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["dni", "nombre", "contacto", "password", "idRol"],
+                "properties": {
+                  "dni": { "type": "string", "example": "40123456" },
+                  "nombre": { "type": "string", "example": "Carlos Gómez" },
+                  "contacto": { "type": "string", "example": "carlos@mail.com" },
+                  "password": { "type": "string", "example": "123456" },
+                  "idRol": { "type": "integer", "example": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Usuario creado" },
+          "400": { "description": "Datos obligatorios faltantes o DNI duplicado" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Obtener perfil de usuario por ID (propio o personal)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 10 } }
+        ],
+        "responses": {
+          "200": { "description": "Datos del usuario" },
+          "403": { "description": "No tiene permiso para ver datos de otro usuario" }
+        }
+      },
+      "patch": {
+        "tags": ["Usuarios"],
+        "summary": "Actualizar datos de un usuario (Recepcionista o Gerente)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 10 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object" } } }
+        },
+        "responses": {
+          "200": { "description": "Usuario actualizado" }
+        }
+      }
+    },
+    "/users/{id}/pagos": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Listar historial de pagos de un usuario (propio o personal)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 10 } }
+        ],
+        "responses": {
+          "200": { "description": "Listado de pagos del usuario" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/sedes": {
+      "get": {
+        "tags": ["Sedes"],
+        "summary": "Listar todas las sedes deportivas",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Listado de sedes" },
+          "401": { "description": "Token JWT ausente o inválido" }
         }
       }
     }
