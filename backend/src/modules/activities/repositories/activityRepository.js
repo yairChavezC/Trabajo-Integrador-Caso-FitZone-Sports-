@@ -21,7 +21,7 @@ const classSelect = `
   s.nombre AS "sede",
   c.fecha_inicio AT TIME ZONE '${argentinaTimeZone}' AS "fechaInicio",
   c.fecha_fin AT TIME ZONE '${argentinaTimeZone}' AS "fechaFin",
-  COALESCE(inscriptos.total, 0)::int > 0 AS "tieneInscripciones",
+  COALESCE(inscriptos.activas, 0)::int > 0 AS "tieneInscripciones",
   COALESCE(inscriptos.confirmados, 0)::int AS "inscriptosConfirmados",
   GREATEST(c.cupo - COALESCE(inscriptos.confirmados, 0), 0)::int AS "cupoDisponible",
   mi.inscripcion AS "miInscripcion"
@@ -32,6 +32,9 @@ const activityJoins = `
     SELECT
       id_clase_grupal,
       COUNT(*) AS total,
+      COUNT(*) FILTER (
+        WHERE estado IN ('confirmado', 'en espera', 'notificado')
+      ) AS activas,
       COUNT(*) FILTER (
         WHERE estado = 'confirmado'
           OR (

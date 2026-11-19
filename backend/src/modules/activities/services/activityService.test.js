@@ -38,6 +38,7 @@ const createMockDependencies = (overrides = {}) => {
     countConfirmed: async () => 2,
     countActiveInscriptions: async () => 0,
     countAllInscriptions: async () => 0,
+    deleteInactiveInscriptionsByClass: async () => 0,
     ...(overrides.inscriptionRepo || {})
   };
 
@@ -126,7 +127,7 @@ test('Actualización de clase: no permite reducir el cupo por debajo de reservas
 test('Eliminación de clase: rechaza si la actividad tiene inscripciones activas', async () => {
   const { service } = createMockDependencies({
     inscriptionRepo: {
-      countAllInscriptions: async () => 3
+      countActiveInscriptions: async () => 3
     }
   });
 
@@ -135,7 +136,7 @@ test('Eliminación de clase: rechaza si la actividad tiene inscripciones activas
     (err) =>
       err instanceof BusinessError &&
       err.status === 409 &&
-      err.message.includes('3 inscripciones asociadas')
+      err.message.includes('3 inscripciones activas')
   );
 });
 
@@ -149,7 +150,7 @@ test('Eliminación de clase: conserva la clase si solo tiene lista de espera', a
     },
     inscriptionRepo: {
       countConfirmed: async () => 0,
-      countAllInscriptions: async () => 1
+      countActiveInscriptions: async () => 1
     }
   });
 
@@ -158,12 +159,12 @@ test('Eliminación de clase: conserva la clase si solo tiene lista de espera', a
     (error) =>
       error instanceof BusinessError &&
       error.status === 409 &&
-      error.message.includes('1 inscripción asociada')
+      error.message.includes('1 inscripción activa')
   );
   assert.equal(deleteCalled, false);
 });
 
-test('Eliminar clase bloquea y borra dentro de la misma transacción', async () => {
+test('Eliminar clase bloquea, limpia historial inactivo y borra dentro de la misma transacción', async () => {
   const client = {};
   const llamadas = [];
   const { service } = createMockDependencies({
@@ -178,9 +179,13 @@ test('Eliminar clase bloquea y borra dentro de la misma transacción', async () 
       }
     },
     inscriptionRepo: {
-      countAllInscriptions: async (_id, transactionClient) => {
+      countActiveInscriptions: async (_id, transactionClient) => {
         llamadas.push(['count', transactionClient]);
         return 0;
+      },
+      deleteInactiveInscriptionsByClass: async (_id, transactionClient) => {
+        llamadas.push(['cleanup', transactionClient]);
+        return 2;
       },
       withTransaction: async (work) => work(client)
     }
@@ -191,6 +196,7 @@ test('Eliminar clase bloquea y borra dentro de la misma transacción', async () 
   assert.deepEqual(llamadas, [
     ['lock', client],
     ['count', client],
+    ['cleanup', client],
     ['delete', client]
   ]);
 });

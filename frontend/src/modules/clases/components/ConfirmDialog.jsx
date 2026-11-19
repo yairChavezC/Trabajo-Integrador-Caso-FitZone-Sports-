@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ConfirmDialog({
   open = false,
@@ -10,6 +10,12 @@ export default function ConfirmDialog({
   onCancel
 }) {
   const [presionado, setPresionado] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setPresionado(false);
+    }
+  }, [open]);
 
   const handleConfirm = (event) => {
     event.preventDefault();

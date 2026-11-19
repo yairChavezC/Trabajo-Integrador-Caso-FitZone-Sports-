@@ -23,7 +23,8 @@ export default function ClaseCard({
   const [confirmandoCancelacion, setConfirmandoCancelacion] = useState(false);
 
   const mia = clase.miInscripcion;
-  const llena = Number(clase.cupoDisponible) <= 0;
+  const disponibles = Number(clase.cupoDisponible ?? clase.cupo ?? 0);
+  const llena = disponibles <= 0;
   const tieneInscripciones = clase.tieneInscripciones === true;
   const puedeMostrarAcciones = !modoAdministracion;
   const estaPendiente = (accion) => isActionPending?.(accion, clase.id) ?? false;
@@ -62,135 +63,161 @@ export default function ClaseCard({
   return (
     <>
       <article className="clase-card">
-      <h3>{clase.nombre}</h3>
-      <p><strong>Instructor:</strong> {clase.profesor}</p>
-      <p>
-        <strong>Horario:</strong> {formatoFecha(clase.fechaInicio)} — {formatoHora(clase.fechaFin)}
-      </p>
-      <p><strong>Lugares:</strong> {clase.cupoDisponible ?? clase.cupo} disponibles de {clase.cupo}</p>
-      <p><strong>Sede:</strong> {clase.sede || `Sede ${clase.idSede}`}</p>
-      {!modoAdministracion && mia && (
-        <div
-          className={`clase-mi-inscripcion estado-${mia.estado.replaceAll(' ', '-')}`}
-          role="status"
-          aria-label="Estado de inscripción"
-        >
-          <EstadoBadge estado={mia.estado} />
-          {mia.estado === 'notificado' ? (
-            <p className="clase-inscripcion-detalle">
-              Aceptá antes del{' '}
-              <time dateTime={mia.fechaExpiracionOferta}>
-                {formatoFecha(mia.fechaExpiracionOferta)}
-              </time>
-              . Si vence, el lugar se ofrecerá a otra persona.
-            </p>
-          ) : (
-            <p className="clase-inscripcion-detalle">{estadoLabel(mia)}</p>
-          )}
+        {/* Fila superior estilo CanchaCard: Sede arriba + Pill de cupos libres */}
+        <div className="clase-card-top-row">
+          <span className="clase-card-eyebrow">
+            {clase.sede || `Sede ${clase.idSede}`}
+          </span>
+          <span className={`clase-card-badge-cupo ${!llena ? 'badge-disponible' : 'badge-completo'}`}>
+            <span className="clase-card-dot">●</span>
+            {!llena ? `${disponibles} libres` : 'Completa'}
+          </span>
         </div>
-      )}
 
-      <div className="clase-actions">
-        {puedeMostrarAcciones && !mia && !llena && (
-          <button
-            type="button"
-            disabled={!clase.puedeReservar || estaPendiente('reservar')}
-            onClick={() => onReservar(clase.id)}
+        <h3>{clase.nombre}</h3>
+
+        <p className="clase-card-instructor">
+          <span>Instructor:</span> <strong>{clase.profesor}</strong>
+        </p>
+
+        {/* Bloque de métricas estilo .card-info-metrics */}
+        <div className="clase-card-metrics">
+          <div className="clase-metric-row">
+            <span className="clase-metric-label">🕒 Horario</span>
+            <span className="clase-metric-value">
+              {formatoFecha(clase.fechaInicio)} — {formatoHora(clase.fechaFin)}
+            </span>
+          </div>
+          <div className="clase-metric-row">
+            <span className="clase-metric-label">👥 Cupos</span>
+            <span className="clase-metric-value">
+              {disponibles} de {clase.cupo} disponibles
+            </span>
+          </div>
+        </div>
+
+        {!modoAdministracion && mia && (
+          <div
+            className={`clase-mi-inscripcion estado-${mia.estado.replaceAll(' ', '-')}`}
+            role="status"
+            aria-label="Estado de inscripción"
           >
-            {estaPendiente('reservar') ? 'Reservando...' : 'Reservar lugar'}
-          </button>
+            <EstadoBadge estado={mia.estado} />
+            {mia.estado === 'notificado' ? (
+              <p className="clase-inscripcion-detalle">
+                Aceptá antes del{' '}
+                <time dateTime={mia.fechaExpiracionOferta}>
+                  {formatoFecha(mia.fechaExpiracionOferta)}
+                </time>
+                . Si vence, el lugar se ofrecerá a otra persona.
+              </p>
+            ) : (
+              <p className="clase-inscripcion-detalle">{estadoLabel(mia)}</p>
+            )}
+          </div>
         )}
-        {puedeMostrarAcciones && !mia && llena && (
-          <button
-            type="button"
-            disabled={!clase.puedeAnotarseListaEspera || estaPendiente('lista-espera')}
-            onClick={() => onListaEspera(clase.id)}
-          >
-            {estaPendiente('lista-espera') ? 'Anotando...' : 'Sumarme a la lista de espera'}
-          </button>
-        )}
-        {puedeMostrarAcciones && mia?.estado === 'notificado' && (
-          <button
-            type="button"
-            disabled={!clase.puedeAceptarOferta || estaPendiente('aceptar-oferta')}
-            onClick={() => onAceptarOferta(clase.id)}
-          >
-            {estaPendiente('aceptar-oferta') ? 'Aceptando...' : 'Aceptar lugar ofrecido'}
-          </button>
-        )}
-        {puedeMostrarAcciones && mia && (
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={!clase.puedeCancelar || estaPendiente('cancelar') || confirmandoCancelacion}
-            onClick={confirmarCancelacion}
-          >
-            {estaPendiente('cancelar')
-              ? 'Cancelando...'
-              : confirmandoCancelacion
-                ? 'Confirmando...'
-                : mia.estado === 'notificado'
-                  ? 'Rechazar lugar ofrecido'
-                  : mia.estado === 'en espera'
-                    ? 'Salir de la lista de espera'
-                    : 'Cancelar reserva'}
-          </button>
-        )}
-        {puedeMostrarAcciones && mia && !clase.puedeCancelar && (
-          <p className="clase-action-note" role="note">
-            {motivoNoPuedeCancelar}
-          </p>
-        )}
-        {modoAdministracion && (
-          <>
+
+        <div className="clase-actions">
+          {puedeMostrarAcciones && !mia && !llena && (
+            <button
+              type="button"
+              disabled={!clase.puedeReservar || estaPendiente('reservar')}
+              onClick={() => onReservar(clase.id)}
+            >
+              {estaPendiente('reservar') ? 'Reservando...' : 'Reservar lugar'}
+            </button>
+          )}
+          {puedeMostrarAcciones && !mia && llena && (
+            <button
+              type="button"
+              disabled={!clase.puedeAnotarseListaEspera || estaPendiente('lista-espera')}
+              onClick={() => onListaEspera(clase.id)}
+            >
+              {estaPendiente('lista-espera') ? 'Anotando...' : 'Sumarme a la lista de espera'}
+            </button>
+          )}
+          {puedeMostrarAcciones && mia?.estado === 'notificado' && (
+            <button
+              type="button"
+              disabled={!clase.puedeAceptarOferta || estaPendiente('aceptar-oferta')}
+              onClick={() => onAceptarOferta(clase.id)}
+            >
+              {estaPendiente('aceptar-oferta') ? 'Aceptando...' : 'Aceptar lugar ofrecido'}
+            </button>
+          )}
+          {puedeMostrarAcciones && mia && (
             <button
               type="button"
               className="btn-secondary"
-              onClick={toggleInscriptos}
-              disabled={cargandoInscriptos}
+              disabled={!clase.puedeCancelar || estaPendiente('cancelar') || confirmandoCancelacion}
+              onClick={confirmarCancelacion}
             >
-              {etiquetaInscriptos}
+              {estaPendiente('cancelar')
+                ? 'Cancelando...'
+                : confirmandoCancelacion
+                  ? 'Confirmando...'
+                  : mia.estado === 'notificado'
+                    ? 'Rechazar lugar ofrecido'
+                    : mia.estado === 'en espera'
+                      ? 'Salir de la lista de espera'
+                      : 'Cancelar reserva'}
             </button>
-            <button type="button" className="btn-secondary" onClick={() => onEdit(clase)}>
-              Editar
-            </button>
-            <button
-              type="button"
-              className="btn-danger"
-              onClick={() => onDelete(clase.id)}
-              aria-describedby={tieneInscripciones ? `clase-${clase.id}-delete-note` : undefined}
-              disabled={tieneInscripciones || estaPendiente('eliminar')}
-            >
-              {estaPendiente('eliminar') ? 'Eliminando...' : 'Eliminar'}
-            </button>
-            {tieneInscripciones && (
-              <p id={`clase-${clase.id}-delete-note`} className="clase-delete-note" role="note">
-                No se puede eliminar: esta clase tiene inscripciones y su historial debe conservarse.
-              </p>
-            )}
-          </>
-        )}
-      </div>
+          )}
+          {puedeMostrarAcciones && mia && !clase.puedeCancelar && (
+            <p className="clase-action-note" role="note">
+              {motivoNoPuedeCancelar}
+            </p>
+          )}
+          {modoAdministracion && (
+            <>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={toggleInscriptos}
+                disabled={cargandoInscriptos}
+              >
+                {etiquetaInscriptos}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => onEdit(clase)}>
+                Editar
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => onDelete(clase.id)}
+                aria-describedby={tieneInscripciones ? `clase-${clase.id}-delete-note` : undefined}
+                disabled={tieneInscripciones || estaPendiente('eliminar')}
+              >
+                {estaPendiente('eliminar') ? 'Eliminando...' : 'Eliminar'}
+              </button>
+              {tieneInscripciones && (
+                <p id={`clase-${clase.id}-delete-note`} className="clase-delete-note" role="note">
+                  No se puede eliminar: esta clase tiene inscripciones y su historial debe conservarse.
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
-      {modoAdministracion && mostrarInscriptos && errorInscriptos && (
-        <p className="clases-alert" role="alert">{errorInscriptos}</p>
-      )}
-      {modoAdministracion && mostrarInscriptos && !errorInscriptos && Array.isArray(inscriptos) && (
-        <InscriptosList inscriptos={inscriptos} />
-      )}
-    </article>
-    <ConfirmDialog
-      open={confirmandoCancelacion}
-      title="Cancelar inscripción"
-      message={mensajeCancelacion}
-      confirmText="Confirmar"
-      cancelText="Cancelar"
-      onConfirm={() => {
-        onCancelar(clase.id);
-        setConfirmandoCancelacion(false);
-      }}
-      onCancel={() => setConfirmandoCancelacion(false)}
-    />
-  </>
+        {modoAdministracion && mostrarInscriptos && errorInscriptos && (
+          <p className="clases-alert" role="alert">{errorInscriptos}</p>
+        )}
+        {modoAdministracion && mostrarInscriptos && !errorInscriptos && Array.isArray(inscriptos) && (
+          <InscriptosList inscriptos={inscriptos} />
+        )}
+      </article>
+      <ConfirmDialog
+        open={confirmandoCancelacion}
+        title="Cancelar inscripción"
+        message={mensajeCancelacion}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+        onConfirm={() => {
+          onCancelar(clase.id);
+          setConfirmandoCancelacion(false);
+        }}
+        onCancel={() => setConfirmandoCancelacion(false)}
+      />
+    </>
   );
 }

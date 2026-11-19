@@ -71,6 +71,26 @@ export const countActiveInscriptions = async (idClase, client = pool) => {
   return rows[0].total;
 };
 
+export const deleteInactiveInscriptionsByClass = async (idClase, client = pool) => {
+  await client.query(
+    `
+      DELETE FROM public.notificaciones_clase_grupal
+      WHERE id_clase_grupal = $1
+    `,
+    [idClase]
+  );
+
+  const { rowCount } = await client.query(
+    `
+      DELETE FROM public.inscripciones_clase_grupal
+      WHERE id_clase_grupal = $1
+        AND estado NOT IN ('confirmado', 'en espera', 'notificado')
+    `,
+    [idClase]
+  );
+  return rowCount;
+};
+
 export const findActiveByUserAndClass = async (idClase, idUsuario, client = pool) => {
   const { rows } = await client.query(
     `

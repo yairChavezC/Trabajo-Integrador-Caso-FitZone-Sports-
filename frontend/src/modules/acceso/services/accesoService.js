@@ -289,15 +289,7 @@ export const accesoService = {
 
     obtenerMisInscripcionesClases: async () => {
         try {
-            const [resInscripciones, resClases] = await Promise.all([
-                httpClient.get('/clases/mis-inscripciones').catch(() => []),
-                httpClient.get('/clases').catch(() => [])
-            ]);
-
-            // El módulo de clases devuelve el Array directo en la raíz de la respuesta
-            const listaDirecta = Array.isArray(resInscripciones)
-                ? resInscripciones
-                : resInscripciones?.data?.data || resInscripciones?.data || [];
+            const resClases = await httpClient.get('/clases');
 
             const catalogoClases = Array.isArray(resClases)
                 ? resClases
@@ -318,17 +310,9 @@ export const accesoService = {
                     }))
                 : [];
 
-            const mapaUnificado = new Map();
-            [...listaDirecta, ...desdeCatalogo].forEach((item) => {
-                const key = item.idClase || item.idInscripcion || item.id;
-                if (key && !mapaUnificado.has(key)) {
-                    mapaUnificado.set(key, item);
-                }
-            });
-
-            return Array.from(mapaUnificado.values()).slice(0, 5);
+            return desdeCatalogo.slice(0, 5);
         } catch (error) {
             return [];
         }
     }
-};
+}

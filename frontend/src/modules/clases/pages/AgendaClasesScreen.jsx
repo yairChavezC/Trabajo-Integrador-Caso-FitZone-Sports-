@@ -153,24 +153,82 @@ export default function AgendaClasesScreen({ puedeInscribirse = false }) {
       )}
       {actionError && <div className="clases-alert" role="alert">{actionError}</div>}
 
+      {/* Barra superior estilo CanchasFiltros */}
+      <div className="agenda-topbar">
+        <div className="clases-tabs agenda-tabs" role="tablist" aria-label="Vistas de clases">
+          <button
+            type="button"
+            role="tab"
+            id="agenda-tab-todas"
+            aria-controls="agenda-panel-todas"
+            aria-selected={tab === 'todas'}
+            tabIndex={tab === 'todas' ? 0 : -1}
+            data-tab="todas"
+            ref={(element) => { tabRefs.current.todas = element; }}
+            onKeyDown={manejarTeclasTab}
+            className={tab === 'todas' ? 'active' : ''}
+            onClick={() => setTab('todas')}
+          >
+            Todas las clases ({clases.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="agenda-tab-mis-clases"
+            aria-controls="agenda-panel-mis-clases"
+            aria-selected={tab === 'mis-clases'}
+            tabIndex={tab === 'mis-clases' ? 0 : -1}
+            data-tab="mis-clases"
+            ref={(element) => { tabRefs.current['mis-clases'] = element; }}
+            onKeyDown={manejarTeclasTab}
+            className={tab === 'mis-clases' ? 'active' : ''}
+            onClick={() => setTab('mis-clases')}
+          >
+            Mis reservas / En espera ({misInscripcionesCount})
+          </button>
+        </div>
+
+        {puedeInscribirse && (
+          <label className="clases-filtro-sede">
+            SEDE:
+            <select
+              aria-label="Filtrar por sede"
+              value={verTodasLasSedes ? 'todas' : 'seleccionada'}
+              onChange={(event) => setVerTodasLasSedes(event.target.value === 'todas')}
+            >
+              <option value="seleccionada">
+                {sedeSeleccionada
+                  ? `Sede seleccionada: ${sedeSeleccionada.nombre}`
+                  : 'Sede seleccionada'}
+              </option>
+              <option value="todas">Todas las sedes</option>
+            </select>
+          </label>
+        )}
+      </div>
+
+      {/* Notificaciones compactas */}
       {puedeInscribirse && (
         <section aria-labelledby="notificaciones-clases-title" className="clases-notificaciones">
-          <div className="clases-section-heading">
+          <div className="clases-notificaciones-header">
             <div>
-              <h3 id="notificaciones-clases-title">Notificaciones</h3>
+              <h3 id="notificaciones-clases-title">🔔 Notificaciones</h3>
               <p>Avisos sobre lugares liberados en clases grupales.</p>
             </div>
+            {!notificacionesCargadas && notificaciones.length === 0 ? (
+              <p className="clases-notificaciones-vacio" role="status">Cargando notificaciones...</p>
+            ) : notificaciones.length === 0 && !errorNotificaciones ? (
+              <p className="clases-notificaciones-vacio" role="status">No tenés notificaciones de clases.</p>
+            ) : null}
           </div>
+
           {errorNotificaciones && (
             <div className="clases-alert" role="alert">
               No se pudieron cargar o actualizar las notificaciones: {errorNotificaciones}
             </div>
           )}
-          {!notificacionesCargadas && notificaciones.length === 0 ? (
-            <p className="clases-empty" role="status">Cargando notificaciones...</p>
-          ) : notificaciones.length === 0 && !errorNotificaciones ? (
-            <p className="clases-empty" role="status">No tenés notificaciones de clases.</p>
-          ) : notificaciones.length > 0 ? (
+
+          {notificaciones.length > 0 && (
             <ul className="clases-notificaciones-lista">
               {notificaciones.map((notificacion) => {
                 const estadoOferta = getEstadoOfertaNotificacion(notificacion);
@@ -216,61 +274,11 @@ export default function AgendaClasesScreen({ puedeInscribirse = false }) {
                 );
               })}
             </ul>
-          ) : null}
+          )}
         </section>
       )}
 
       <section aria-label="Agenda de clases">
-        {puedeInscribirse && (
-          <label className="clases-filtro-sede">
-            Mostrar clases de
-            <select
-              aria-label="Filtrar por sede"
-              value={verTodasLasSedes ? 'todas' : 'seleccionada'}
-              onChange={(event) => setVerTodasLasSedes(event.target.value === 'todas')}
-            >
-              <option value="seleccionada">
-                {sedeSeleccionada
-                  ? `Sede seleccionada: ${sedeSeleccionada.nombre}`
-                  : 'Sede seleccionada'}
-              </option>
-              <option value="todas">Todas las sedes</option>
-            </select>
-          </label>
-        )}
-        <div className="clases-tabs agenda-tabs" role="tablist" aria-label="Vistas de clases">
-          <button
-            type="button"
-            role="tab"
-            id="agenda-tab-todas"
-            aria-controls="agenda-panel-todas"
-            aria-selected={tab === 'todas'}
-            tabIndex={tab === 'todas' ? 0 : -1}
-            data-tab="todas"
-            ref={(element) => { tabRefs.current.todas = element; }}
-            onKeyDown={manejarTeclasTab}
-            className={tab === 'todas' ? 'active' : ''}
-            onClick={() => setTab('todas')}
-          >
-            Todas las clases ({clases.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="agenda-tab-mis-clases"
-            aria-controls="agenda-panel-mis-clases"
-            aria-selected={tab === 'mis-clases'}
-            tabIndex={tab === 'mis-clases' ? 0 : -1}
-            data-tab="mis-clases"
-            ref={(element) => { tabRefs.current['mis-clases'] = element; }}
-            onKeyDown={manejarTeclasTab}
-            className={tab === 'mis-clases' ? 'active' : ''}
-            onClick={() => setTab('mis-clases')}
-          >
-            Mis reservas / En espera ({misInscripcionesCount})
-          </button>
-        </div>
-
         {['todas', 'mis-clases'].map((vista) => {
           const activa = tab === vista;
           const clasesDeVista = vista === 'mis-clases'

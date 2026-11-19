@@ -142,17 +142,18 @@ export const createActivityService = (dependencies = {}) => {
       return await inscriptionRepo.withTransaction(async (client) => {
         const clase = await activityRepo.lockActivityById(id, client);
         if (!clase) return null;
-        const inscripciones = await inscriptionRepo.countAllInscriptions(id, client);
-        if (inscripciones > 0) {
-          const detalle = inscripciones === 1
-            ? '1 inscripción asociada'
-            : `${inscripciones} inscripciones asociadas`;
+        const inscripcionesActivas = await inscriptionRepo.countActiveInscriptions(id, client);
+        if (inscripcionesActivas > 0) {
+          const detalle = inscripcionesActivas === 1
+            ? '1 inscripción activa'
+            : `${inscripcionesActivas} inscripciones activas`;
           throw new BusinessError(
-            `No se puede eliminar la clase porque tiene ${detalle}. El historial debe conservarse.`,
+            `No se puede eliminar la clase porque tiene ${detalle}.`,
             409
           );
         }
 
+        await inscriptionRepo.deleteInactiveInscriptionsByClass?.(id, client);
         return activityRepo.deleteActivity(id, client);
       });
     } catch (error) {
