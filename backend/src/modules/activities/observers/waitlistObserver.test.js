@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ConsoleWaitlistObserver,
+  NotificationPersistenceObserver,
   WaitlistSubject
 } from './waitlistObserver.js';
 
@@ -71,6 +72,36 @@ test('un fallo en un observer no impide notificar a los siguientes', async () =>
   } finally {
     console.error = errorOriginal;
   }
+});
+
+test('la notificación persistente usa el cliente de la transacción', async () => {
+  const calls = [];
+  const transactionClient = {};
+  const observer = new NotificationPersistenceObserver({
+    async createWaitlistPromotion(evento, client) {
+      calls.push({ evento, client });
+    }
+  });
+
+  const evento = { idClase: 1, idUsuario: 2 };
+  await observer.update(evento, { transactionClient });
+
+  assert.deepEqual(calls, [{ evento, client: transactionClient }]);
+});
+
+test('un error en un observer transaccional se propaga para permitir el rollback', async () => {
+  const subject = new WaitlistSubject();
+  subject.subscribe({
+    transactional: true,
+    async update() {
+      throw new Error('Falló la persistencia de la notificación.');
+    }
+  });
+
+  await assert.rejects(
+    () => subject.notify({ idClase: 1 }, { transactionClient: {} }),
+    /Falló la persistencia de la notificación/
+  );
 });
 
 test('el observer registra el aviso de la oferta sin persistencia externa', async () => {

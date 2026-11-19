@@ -1,3 +1,6 @@
+/**
+ * Transactional observers run before commit and may abort it; secondary observers run after commit.
+ */
 export class WaitlistSubject {
   constructor() {
     this.observers = [];
@@ -10,8 +13,17 @@ export class WaitlistSubject {
     };
   }
 
-  async notify(evento) {
+  async notify(evento, { transactionClient } = {}) {
+    const dentroDeTransaccion = transactionClient !== undefined && transactionClient !== null;
+
     for (const observer of this.observers) {
+      if (Boolean(observer.transactional) !== dentroDeTransaccion) continue;
+
+      if (dentroDeTransaccion) {
+        await observer.update(evento, { transactionClient });
+        continue;
+      }
+
       try {
         await observer.update(evento);
       } catch (error) {
@@ -19,6 +31,21 @@ export class WaitlistSubject {
         console.error(`[Observer/ListaEspera] Error notificando ${observerName}:`, error);
       }
     }
+  }
+}
+
+export class NotificationPersistenceObserver {
+  constructor(notificationRepo) {
+    this.notificationRepo = notificationRepo;
+    this.transactional = true;
+  }
+
+  async update(evento, { transactionClient } = {}) {
+    if (!transactionClient) {
+      throw new Error('El observer de notificaciones requiere una transacción activa.');
+    }
+
+    return this.notificationRepo.createWaitlistPromotion(evento, transactionClient);
   }
 }
 
@@ -31,5 +58,14 @@ export class ConsoleWaitlistObserver {
   }
 }
 
-export const classWaitlistSubject = new WaitlistSubject();
-classWaitlistSubject.subscribe(new ConsoleWaitlistObserver());
+export const createWaitlistSubject = (
+  notificationRepo,
+  secondaryObservers = [new ConsoleWaitlistObserver()]
+) => {
+  const subject = new WaitlistSubject();
+  subject.subscribe(new NotificationPersistenceObserver(notificationRepo));
+  for (const observer of secondaryObservers) {
+    subject.subscribe(observer);
+  }
+  return subject;
+};
