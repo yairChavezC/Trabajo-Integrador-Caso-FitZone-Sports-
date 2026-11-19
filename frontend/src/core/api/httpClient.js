@@ -33,13 +33,11 @@ httpClient.interceptors.response.use(
         if (error.response) {
             const status = error.response.status;
 
-            // Manejo de sesión expirada o token inválido (cubre 401 Unauthorized y 403 Forbidden)
-            if (status === 401 || status === 403) {
+            if (status === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('sedeId');
-                localStorage.removeItem('user'); // O la clave que uses para la sesión
+                localStorage.removeItem('usuario');
 
-                // Redirige al login únicamente si no estamos ya allí
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                 }

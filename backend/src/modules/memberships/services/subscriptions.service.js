@@ -34,13 +34,12 @@ export function createSubscriptionsService({
     return defaultSubject;
   })();
 
-  async function renovarMembresia({ idUsuario, idPlan }) {
+    async function renovarMembresia({ idUsuario, idPlan, metodoPago, paymentToken, idempotencyKey }) {
     const plan = await plansRepository.findById(idPlan);
     if (!plan || !plan.activo) {
       throw httpError('El plan no existe o no está disponible', 400);
     }
 
-    // Strategy: calculamos el precio final según el tipo de plan
     const tipoPlan = plan.tipo || plan.categoria || 'REGULAR';
     const estrategia = obtenerEstrategiaDePrecio(tipoPlan);
     const precioFinal = Number(estrategia.calcular(Number(plan.precio)));
@@ -48,12 +47,19 @@ export function createSubscriptionsService({
     const resultadoPago = await paymentService.processPayment({
       userId: idUsuario,
       monto: precioFinal,
+      moneda: 'ARS',
+      metodoPago,
+      paymentToken,
       concepto: `Membresía - ${plan.nombre}`,
+      idempotencyKey,
     });
 
-    if (!resultadoPago.success) {
+    // Rechazado o pendiente de acreditación: no se extiende la membresía
+    const pagoPendiente = resultadoPago.payment?.estado === 'PENDIENTE';
+    if (!resultadoPago.success || pagoPendiente) {
       return {
         pagoAprobado: false,
+        pendiente: pagoPendiente,
         pago: resultadoPago.payment,
         mensaje: resultadoPago.message,
       };

@@ -33,8 +33,9 @@ export const useLogin = () => {
       login(data);
 
       // 3. Redirigimos a la vista inicial autenticada
-      navigate('/acceso', { replace: true });
-    } catch (err) {
+      const rol = Number(data?.usuario?.rol);
+      // Cliente externo: solo reserva de canchas
+      navigate(rol === 2 ? '/canchas' : '/acceso', { replace: true });    } catch (err) {
       setError(err.message || 'Error de conexión');
     } finally {
       setCargando(false);

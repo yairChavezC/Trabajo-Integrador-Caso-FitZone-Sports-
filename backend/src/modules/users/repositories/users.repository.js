@@ -57,5 +57,14 @@ export function createUsersRepository(pool) {
     return result.rows;
   }
 
-  return { findAll, findById, findByDni, create, findPagosByUsuario };
+    async function update(id, { nombre, contacto, activo }) {
+    const result = await pool.query(
+      `UPDATE usuario SET nombre = $2, contacto = $3, activo = $4
+       WHERE id = $1 RETURNING id`,
+      [id, nombre, contacto, activo]
+    );
+    return result.rows[0] || null;
+  }
+
+  return { findAll, findById, findByDni, create, update, findPagosByUsuario };
 }

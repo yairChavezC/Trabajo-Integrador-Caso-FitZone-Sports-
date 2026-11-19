@@ -115,3 +115,15 @@
   outline: none;
   border-color: var(--fz-primary);
 }
+
+.nuevo-socio-alert {
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #e34c4c;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.4;
+}

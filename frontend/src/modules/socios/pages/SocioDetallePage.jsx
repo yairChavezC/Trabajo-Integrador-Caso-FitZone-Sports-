@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, ChevronRight, Info, Receipt, User } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, ChevronRight, Download, Info, Receipt, User } from 'lucide-react';
+import { httpClient } from '../../../core/api/httpClient';
 import { getMemberById, getMemberPagos } from '../services/membersService';
+import { esSocioOExterno } from '../session';
 import RenovarMembresiaModal from '../components/RenovarMembresiaModal';
+import EditarSocioModal from '../components/EditarSocioModal';
 import './SocioDetallePage.css';
 
 const FORMATO_PRECIO = new Intl.NumberFormat('es-AR', {
@@ -17,6 +20,26 @@ const ESTADO_PAGO = {
   RECHAZADO: { texto: 'Rechazado', clase: 'is-expired' },
   PENDIENTE: { texto: 'Pendiente', clase: 'is-suspended' },
 };
+
+async function descargarComprobantePdf(pagoId) {
+  if (!pagoId) {
+    throw new Error('No se encontró el identificador del pago para descargar el comprobante.');
+  }
+
+  const blobData = await httpClient.get(`/payments/${pagoId}/comprobante`, {
+    responseType: 'blob',
+  });
+
+  const blob = blobData instanceof Blob ? blobData : new Blob([blobData], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `comprobante-${pagoId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
 
 function formatFecha(valor, timeZone) {
   if (!valor) return '—';
@@ -63,10 +86,17 @@ function getEstado(socio) {
 
 export default function SocioDetallePage() {
   const { id } = useParams();
+  const restringido = esSocioOExterno();
   const [socio, setSocio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showRenovar, setShowRenovar] = useState(false);
+  const [showEditar, setShowEditar] = useState(false);
+
+  const [ultimoPagoId, setUltimoPagoId] = useState(null);
+  const [mensajePago, setMensajePago] = useState(null);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const [errorComprobante, setErrorComprobante] = useState(null);
 
   const [pagos, setPagos] = useState([]);
   const [loadingPagos, setLoadingPagos] = useState(true);
@@ -113,9 +143,11 @@ export default function SocioDetallePage() {
         <p className="detalle-state detalle-state-error">
           {error || 'No se encontró al socio.'}
         </p>
-        <Link to="/socios" className="detalle-btn detalle-btn-secondary">
-          <ArrowLeft size={15} /> Volver a socios
-        </Link>
+        {!restringido && (
+          <Link to="/socios" className="detalle-btn detalle-btn-secondary">
+            <ArrowLeft size={15} /> Volver a socios
+          </Link>
+        )}
       </main>
     );
   }
@@ -125,9 +157,28 @@ export default function SocioDetallePage() {
   const tieneMembresia = Boolean(socio.fechaProximoVencimiento);
   const dias = tieneMembresia ? diasRestantes(socio.fechaProximoVencimiento) : null;
 
-  async function handleRenovado() {
+  async function handleRenovado(resultadoPago) {
+    if (resultadoPago?.pagoId) {
+      setUltimoPagoId(resultadoPago.pagoId);
+    }
+    setMensajePago(
+      resultadoPago?.mensaje || 'Pago aprobado y membresía renovada correctamente.'
+    );
+    setErrorComprobante(null);
     await cargarSocio();
     await cargarPagos();
+  }
+
+  async function handleDescargarComprobante(pagoId) {
+    setDescargandoPdf(true);
+    setErrorComprobante(null);
+    try {
+      await descargarComprobantePdf(pagoId);
+    } catch (err) {
+      setErrorComprobante(err.message || 'No se pudo descargar el comprobante PDF.');
+    } finally {
+      setDescargandoPdf(false);
+    }
   }
 
   return (
@@ -136,8 +187,12 @@ export default function SocioDetallePage() {
         <nav className="detalle-breadcrumb" aria-label="Ruta de navegación">
           <span>Administración</span>
           <ChevronRight size={12} />
-          <Link to="/socios">Socios</Link>
-          <ChevronRight size={12} />
+          {!restringido ? (
+            <>
+              <Link to="/socios">Socios</Link>
+              <ChevronRight size={12} />
+            </>
+          ) : null}
           <span className="detalle-breadcrumb-current">Detalle del socio</span>
         </nav>
 
@@ -148,11 +203,53 @@ export default function SocioDetallePage() {
               Consultá la información personal y el estado de su membresía.
             </p>
           </div>
-          <Link to="/socios" className="detalle-btn detalle-btn-secondary">
-            <ArrowLeft size={15} /> Volver a socios
-          </Link>
+          {!restringido && (
+            <Link to="/socios" className="detalle-btn detalle-btn-secondary">
+              <ArrowLeft size={15} /> Volver a socios
+            </Link>
+          )}
         </div>
       </section>
+
+      {mensajePago && (
+        <div
+          role="status"
+          style={{
+            padding: '12px 16px',
+            borderRadius: '8px',
+            background: '#eaf7f0',
+            color: '#169768',
+            fontWeight: 600,
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>
+            {mensajePago} {ultimoPagoId ? `(Pago #${ultimoPagoId})` : ''}
+          </span>
+          {ultimoPagoId && (
+            <button
+              type="button"
+              className="detalle-btn detalle-btn-secondary"
+              onClick={() => handleDescargarComprobante(ultimoPagoId)}
+              disabled={descargandoPdf}
+            >
+              <Download size={14} />
+              {descargandoPdf ? 'Descargando PDF...' : 'Descargar comprobante PDF'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {errorComprobante && (
+        <p className="detalle-state-error" role="alert">
+          {errorComprobante}
+        </p>
+      )}
 
       <section className="detalle-profile">
         <span className="detalle-avatar">{iniciales(socio.nombre)}</span>
@@ -164,14 +261,15 @@ export default function SocioDetallePage() {
         </div>
         <div className="detalle-profile-actions">
           <span className={`detalle-status ${estado.clase}`}>{estado.texto}</span>
-          <button
-            type="button"
-            className="detalle-btn detalle-btn-secondary"
-            disabled
-            title="Próximamente"
-          >
-            Editar socio
-          </button>
+          {!restringido && (
+            <button
+              type="button"
+              className="detalle-btn detalle-btn-secondary"
+              onClick={() => setShowEditar(true)}
+            >
+              Editar socio
+            </button>
+          )}
         </div>
       </section>
 
@@ -228,9 +326,22 @@ export default function SocioDetallePage() {
                           {formatFecha(pago.fechaPago)} · {pago.medioPago}
                         </span>
                       </div>
-                      <span className={`detalle-status ${estadoPago.clase}`}>
-                        {estadoPago.texto}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className={`detalle-status ${estadoPago.clase}`}>
+                          {estadoPago.texto}
+                        </span>
+                        {pago.estado === 'APROBADO' && (
+                          <button
+                            type="button"
+                            className="detalle-btn detalle-btn-secondary"
+                            onClick={() => handleDescargarComprobante(pago.id)}
+                            disabled={descargandoPdf}
+                            title="Descargar comprobante PDF"
+                          >
+                            <Download size={14} /> PDF
+                          </button>
+                        )}
+                      </div>
                     </li>
                   );
                 })}
@@ -284,6 +395,18 @@ export default function SocioDetallePage() {
           socio={socio}
           onClose={() => setShowRenovar(false)}
           onRenovado={handleRenovado}
+        />
+      )}
+
+      {showEditar && !restringido && (
+        <EditarSocioModal
+          socio={socio}
+          onClose={() => setShowEditar(false)}
+          onUpdated={async () => {
+            await cargarSocio();
+            setUltimoPagoId(null);
+            setMensajePago('Socio actualizado correctamente.');
+          }}
         />
       )}
     </main>

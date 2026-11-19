@@ -26,3 +26,11 @@ export function toUserResponseDTO(user) {
     idPlan: user.id_plan ?? null,
   };
 }
+
+export function toUpdateUserDTO(body) {
+  return {
+    nombre: body.nombre === undefined ? undefined : String(body.nombre).trim(),
+    contacto: body.contacto === undefined ? undefined : String(body.contacto).trim(),
+    activo: body.activo,
+  };
+}

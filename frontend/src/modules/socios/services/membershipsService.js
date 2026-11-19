@@ -1,5 +1,6 @@
 import { httpClient } from '../../../core/api/httpClient';
 
-export async function renovarMembresia(idUsuario, idPlan) {
-  return httpClient.post(`/memberships/${idUsuario}/renovar`, { idPlan });
+// El backend cobra vía Módulo de Pagos (M5) y recién después extiende la membresía
+export async function renovarMembresia(idUsuario, datos) {
+  return httpClient.post(`/memberships/${idUsuario}/renovar`, datos);
 }

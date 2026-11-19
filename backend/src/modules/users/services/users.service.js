@@ -57,5 +57,35 @@ export function createUsersService({ usersRepository }) {
     return usersRepository.findPagosByUsuario(id);
   }
 
-  return { getAllUsers, getUserById, createUser, getPagosByUsuario };
+    async function updateUser(id, data) {
+    const actual = await getUserById(id);
+
+    // Solo se editan socios y clientes externos (no personal)
+    if (!ROLES_PERMITIDOS_EN_ALTA.includes(Number(actual.id_rol))) {
+      throw httpError('Solo se pueden editar socios y clientes externos', 403);
+    }
+
+    const nombre = data.nombre ?? actual.nombre;
+    const contacto = data.contacto ?? actual.contacto;
+    if (!nombre || !contacto) {
+      throw httpError('Nombre y contacto son obligatorios', 400);
+    }
+    if (data.activo !== undefined && typeof data.activo !== 'boolean') {
+      throw httpError('El estado debe ser true o false', 400);
+    }
+    const activo = data.activo ?? actual.activo;
+
+    try {
+      await usersRepository.update(actual.id, { nombre, contacto, activo });
+    } catch (error) {
+      if (error.code === '23505') {
+        throw httpError('Ya existe un usuario con ese contacto', 409);
+      }
+      throw error;
+    }
+    return getUserById(actual.id);
+  }
+
+  return { getAllUsers, getUserById, createUser, updateUser, getPagosByUsuario };
+
 }

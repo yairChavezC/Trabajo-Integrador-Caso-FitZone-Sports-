@@ -1,4 +1,5 @@
-import { toCreateUserDTO, toUserResponseDTO } from '../dtos/users.dto.js';
+import { toCreateUserDTO, toUpdateUserDTO, toUserResponseDTO } from '../dtos/users.dto.js';
+
 
 export function createUsersController(service) {
   async function getUsers(req, res, next) {
@@ -47,6 +48,15 @@ export function createUsersController(service) {
     }
   }
 
+  async function updateUser(req, res, next) {
+    try {
+      const usuario = await service.updateUser(req.params.id, toUpdateUserDTO(req.body));
+      res.json(toUserResponseDTO(usuario));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async function getPagos(req, res, next) {
     try {
       const pagos = await service.getPagosByUsuario(req.params.id);
@@ -65,5 +75,4 @@ export function createUsersController(service) {
     }
   }
 
-  return { getUsers, getUser, createUser, getPagos };
-}
+  return { getUsers, getUser, createUser, updateUser, getPagos };}
