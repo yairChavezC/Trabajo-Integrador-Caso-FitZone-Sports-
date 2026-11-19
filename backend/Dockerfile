@@ -6,9 +6,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copiar código fuente y documentación OpenAPI
+# Copiar código fuente, migraciones y documentación OpenAPI
 COPY src ./src
 COPY swagger.json ./swagger.json
+COPY apply_migrations.mjs ./apply_migrations.mjs
+COPY migrations ./migrations
 
 EXPOSE 3000
 

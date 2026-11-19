@@ -11,6 +11,11 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
+      # Completá si el backend usa variables de OIDC:
+      # OIDC_ISSUER: ${OIDC_ISSUER}
+      # OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      # OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI}
     restart: unless-stopped
 
   frontend:
@@ -19,6 +24,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/}
+        # Agregá acá cualquier VITE_* de OIDC si la usa el frontend:
+        # VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID}
     container_name: fitzone-frontend
     ports:
       - "5173:5173"
