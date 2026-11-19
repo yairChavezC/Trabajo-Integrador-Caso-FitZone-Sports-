@@ -24,9 +24,9 @@ test('Concurrencia - Módulo 3: no sobreventa de cupo en reservas de clases grup
   );
 
   process.env.DATABASE_URL = testDatabaseUrl;
-  const [{ default: pool }, inscriptionService] = await Promise.all([
-    import('../../config/db.js'),
-    import('./services/inscriptionService.js')
+ const [{ default: pool }, inscriptionService] = await Promise.all([
+    import('../src/config/db.js'),
+    import('../src/modules/activities/services/inscriptionService.js')
   ]);
 
   // Las columnas de fecha son TIMESTAMP WITHOUT TIME ZONE interpretadas como

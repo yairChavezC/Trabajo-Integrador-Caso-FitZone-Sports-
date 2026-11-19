@@ -1,8 +1,7 @@
 ﻿import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BusinessError } from './errors.js';
-
+import { BusinessError } from '../src/modules/activities/errors.js';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
 const databaseIdentity = (connectionString) => {
@@ -44,11 +43,11 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
 
   process.env.DATABASE_URL = testDatabaseUrl;
   const [{ default: pool }, activityService, inscriptionService] = await Promise.all([
-    import('../../config/db.js'),
-    import('./services/activityService.js'),
-    import('./services/inscriptionService.js')
+    import('../src/config/db.js'),
+    import('../src/modules/activities/services/activityService.js'),
+    import('../src/modules/activities/services/inscriptionService.js')
   ]);
-  const activityController = await import('./controllers/activityController.js');
+  const activityController = await import('../src/modules/activities/controllers/activityController.js');
 
   // Las columnas fecha_inicio/fecha_fin son TIMESTAMP WITHOUT TIME ZONE y el
   // repositorio las interpreta como hora de Buenos Aires (AT TIME ZONE en las
@@ -172,7 +171,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
 
     const [{ default: express }, { default: activityRoutes }] = await Promise.all([
       import('express'),
-      import('./routes/activityRoutes.js')
+      import('../src/modules/activities/routes/activityRoutes.js')
     ]);
     const endpointApp = express();
     endpointApp.use(express.json());

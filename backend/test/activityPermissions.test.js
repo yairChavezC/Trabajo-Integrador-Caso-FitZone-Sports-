@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {
   createRequireAgendaManager,
   createRequireRoles
-} from './activityRoutes.js';
+} from '../src/modules/activities/routes/activityRoutes.js';
 import {
   createGetActivitiesController,
   createGetActivityByIdController
-} from '../controllers/activityController.js';
+} from '../src/modules/activities/controllers/activityController.js';
 
 const createMockReqRes = (usuario, method = 'GET', path = '/', body = {}, params = {}) => {
   const req = {

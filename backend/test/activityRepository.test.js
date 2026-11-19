@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import pool from '../../../config/db.js';
-import * as activityRepository from './activityRepository.js';
+import pool from '../src/config/db.js';
+import * as activityRepository from '../src/modules/activities/repositories/activityRepository.js';
 
 test('activityRepository usa sus consultas y clientes de transacción', async (t) => {
   const llamadas = [];

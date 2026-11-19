@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CreateActivityDTO, UpdateActivityDTO } from './activity.dto.js';
-
+import { CreateActivityDTO, UpdateActivityDTO } from '../src/modules/activities/dtos/activity.dto.js';
 const claseActual = {
   idSede: 1,
   nombre: 'Yoga',

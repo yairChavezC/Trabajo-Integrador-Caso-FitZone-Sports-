@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createActivityService } from './activityService.js';
-import { BusinessError } from '../errors.js';
+import { createActivityService } from '../src/modules/activities/services/activityService.js';
+import { BusinessError } from '../src/modules/activities/errors.js';
 
 const makeFixedNow = (isoString) => () => new Date(isoString).getTime();
 

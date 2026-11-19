@@ -10,7 +10,7 @@ import {
   validarReduccionDeCupo,
   validarInicioFuturo,
   calcularAccionesClase
-} from './classPolicy.js';
+} from '../src/modules/activities/domain/classPolicy.js';
 
 const AHORA = new Date('2026-10-18T12:00:00Z').getTime();
 const horasDesdeAhora = (horas) => new Date(AHORA + horas * 60 * 60 * 1000);

@@ -4,7 +4,7 @@ import {
   ConsoleWaitlistObserver,
   NotificationPersistenceObserver,
   WaitlistSubject
-} from './waitlistObserver.js';
+} from '../src/modules/activities/observers/waitlistObserver.js';
 
 test('el subject notifica en orden a los observers suscriptos', async () => {
   const subject = new WaitlistSubject();

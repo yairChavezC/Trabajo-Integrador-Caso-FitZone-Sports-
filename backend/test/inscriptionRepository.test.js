@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import pool from '../../../config/db.js';
-import * as inscriptionRepository from './inscriptionRepository.js';
-import * as membershipRepository from './membershipRepository.js';
+import pool from '../src/config/db.js';
+import * as inscriptionRepository from '../src/modules/activities/repositories/inscriptionRepository.js';
+import * as membershipRepository from '../src/modules/activities/repositories/membershipRepository.js';
 
 test('inscriptionRepository usa transacciones y consulta sus operaciones', async (t) => {
   const llamadas = [];

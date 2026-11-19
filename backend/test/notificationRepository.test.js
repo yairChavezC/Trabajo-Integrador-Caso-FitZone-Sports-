@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import pool from '../../../config/db.js';
-import * as notificationRepository from './notificationRepository.js';
+import pool from '../src/config/db.js';
+import * as notificationRepository from '../src/modules/activities/repositories/notificationRepository.js';
 
 test('notificationRepository restringe por socio y conserva notificaciones leídas', async (t) => {
   const llamadas = [];

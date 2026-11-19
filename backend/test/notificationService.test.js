@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getClassNotifications, markClassNotificationAsRead } from './notificationService.js';
-import { BusinessError } from '../errors.js';
+import { getClassNotifications, markClassNotificationAsRead } from '../src/modules/activities/services/notificationService.js';
+import { BusinessError } from '../src/modules/activities/errors.js';
 
 test('getClassNotifications rechaza usuario no autenticado', async () => {
   await assert.rejects(

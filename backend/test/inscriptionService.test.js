@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInscriptionService } from './inscriptionService.js';
-import { BusinessError } from '../errors.js';
-import { createWaitlistSubject } from '../observers/waitlistObserver.js';
+import { createInscriptionService } from '../src/modules/activities/services/inscriptionService.js';
+import { BusinessError } from '../src/modules/activities/errors.js';
+import { createWaitlistSubject } from '../src/modules/activities/observers/waitlistObserver.js';
 
 const makeFixedNow = (isoString) => () => new Date(isoString).getTime();
 
@@ -162,7 +162,7 @@ test('Reserva: rechaza reserva si el cupo está completo y sugiere lista de espe
       hasActiveMembership: async () => true
     },
     inscriptionRepo: {
-      countConfirmed: async () => 5 // Cupo es 5
+      countConfirmed: async () => 5
     }
   });
 
@@ -197,7 +197,7 @@ test('Lista de espera: rechaza inscripción si todavía existen cupos confirmado
       hasActiveMembership: async () => true
     },
     inscriptionRepo: {
-      countConfirmed: async () => 3 // Cupo es 5
+      countConfirmed: async () => 3
     }
   });
 
@@ -213,7 +213,7 @@ test('Lista de espera: rechaza inscripción si todavía existen cupos confirmado
 test('Cancelación: reserva confirmada con más de 2 horas se cancela y promueve al siguiente de lista de espera', async () => {
   let promotedId = null;
   const { service, notifiedEvents, persistedNotifications, transactionClient } = createMockDependencies({
-    now: makeFixedNow('2026-11-06T06:00:00.000Z'), // 4 horas antes del inicio (10:00)
+    now: makeFixedNow('2026-11-06T06:00:00.000Z'),
     membershipRepo: {
       hasActiveMembership: async () => true,
       findNextWaitlist: async () => ({ id: 77, idUsuario: 33 }),
@@ -222,7 +222,7 @@ test('Cancelación: reserva confirmada con más de 2 horas se cancela y promueve
     inscriptionRepo: {
       findActiveByUserAndClass: async () => ({ id: 45, estado: 'confirmado' }),
       cancelInscription: async (id) => ({ id, estado: 'cancelado' }),
-      countConfirmed: async () => 4, // tras cancelar, queda en 4 de 5
+      countConfirmed: async () => 4,
       promoteWaitlistInscription: async (id) => { promotedId = id; return { id, idUsuario: 33, estado: 'notificado' } }
     }
   });
@@ -304,7 +304,7 @@ test('un fallo en un observer secundario no revierte la cancelación ni la ofert
 
 test('Cancelación: reserva confirmada con menos de 2 horas se cancela como tardía', async () => {
   let canceladaConEstado = null;
-  const ahora = makeFixedNow('2026-11-06T09:30:00.000Z'); // 30 minutos antes del inicio (10:00)
+  const ahora = makeFixedNow('2026-11-06T09:30:00.000Z');
   const { service } = createMockDependencies({
     now: ahora,
     membershipRepo: {
@@ -327,7 +327,7 @@ test('Cancelación: reserva confirmada con menos de 2 horas se cancela como tard
 
 test('Cancelación: socio en lista de espera puede cancelar con menos de 2 horas antes de la clase', async () => {
   const { service, notifiedEvents } = createMockDependencies({
-    now: makeFixedNow('2026-11-06T09:15:00.000Z'), // 45 minutos antes del inicio
+    now: makeFixedNow('2026-11-06T09:15:00.000Z'),
     membershipRepo: {
       hasActiveMembership: async () => true
     },
@@ -345,7 +345,7 @@ test('Cancelación: socio en lista de espera puede cancelar con menos de 2 horas
 
 test('Cancelación: oferta notificada cancelada con menos de 2 horas se libera y ofrece al siguiente', async () => {
   const { service, notifiedEvents } = createMockDependencies({
-    now: makeFixedNow('2026-11-06T09:00:00.000Z'), // 1 hora antes del inicio
+    now: makeFixedNow('2026-11-06T09:00:00.000Z'),
     membershipRepo: {
       hasActiveMembership: async () => true,
       findNextWaitlist: async () => ({ id: 88, idUsuario: 44 }),
@@ -424,7 +424,7 @@ test('Aceptación de oferta: rechaza oferta vencida o inexistente', async () => 
 
 test('Aceptación de oferta: rechaza si la clase ya comenzó', async () => {
   const { service } = createMockDependencies({
-    now: makeFixedNow('2026-11-06T10:05:00.000Z'), // 5 min después del inicio
+    now: makeFixedNow('2026-11-06T10:05:00.000Z'),
     membershipRepo: {
       hasActiveMembership: async () => true
     }
@@ -444,7 +444,7 @@ test('Lista de espera: promueve a múltiples personas si se liberan varios cupos
     { id: 101, idUsuario: 201 },
     { id: 102, idUsuario: 202 }
   ];
-  let currentConfirmed = 3; // Cupo es 5 -> hay 2 lugares libres
+  let currentConfirmed = 3;
 
   const { service, notifiedEvents } = createMockDependencies({
     activityRepo: {
