@@ -5,6 +5,7 @@ import {
   createClase,
   updateClase,
   deleteClase,
+  getInscripcionesClase,
   reservarClase,
   cancelarReservaClase,
   anotarListaEspera,
@@ -14,59 +15,89 @@ import {
 const unwrap = (payload) => payload?.data ?? payload;
 const toList = (data) => Array.isArray(data) ? data : data?.data ?? [];
 
-const loadClases = async (incluirPasadas) => toList(await getClases(incluirPasadas));
+const loadClases = async (incluirPasadas, idSede) =>
+  toList(await getClases(incluirPasadas, idSede));
 
-export const useClases = ({ incluirPasadas = false } = {}) => {
+export const useClases = (options = {}) => {
+  const { incluirPasadas = false } = options;
   const { sedeSeleccionada } = useSede();
+  const idSede = Object.hasOwn(options, 'idSede')
+    ? options.idSede
+    : sedeSeleccionada?.id ?? null;
   const [clases, setClases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [inscriptosPorClase, setInscriptosPorClase] = useState({});
+  const [cargandoInscriptosPorClase, setCargandoInscriptosPorClase] = useState({});
+  const [errorInscriptosPorClase, setErrorInscriptosPorClase] = useState({});
   const [pendingActions, setPendingActions] = useState({});
   const pendingActionsRef = useRef(new Set());
+  const requestIdRef = useRef(0);
 
   const fetchClases = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
-      setClases(await loadClases(incluirPasadas));
+      const data = await loadClases(incluirPasadas, idSede);
+      if (requestId !== requestIdRef.current) return false;
+
+      setClases(data);
+      setHasLoaded(true);
       setError(null);
       return true;
     } catch (err) {
-      setError(err.message);
+      if (requestId === requestIdRef.current) setError(err.message);
       return false;
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [incluirPasadas]);
+  }, [incluirPasadas, idSede]);
 
+  /**
+   * Decisión de diseño: Sondeo automático (polling) cada 30 segundos.
+   * Se realizan dos consultas por vista (clases y notificaciones) para mantener
+   * sincronizados en tiempo real el estado de los cupos, reservas y ofertas de lista
+   * de espera, garantizando una experiencia fluida sin sobrecargar el servidor.
+   */
   useEffect(() => {
-    let desmontado = false;
-    const cargar = async () => {
-      try {
-        const data = await loadClases(incluirPasadas);
-        if (desmontado) return;
-        setClases(data);
-        setError(null);
-      } catch (err) {
-        if (!desmontado) setError(err.message);
-      } finally {
-        if (!desmontado) setLoading(false);
-      }
+    let activo = true;
+    const actualizar = () => {
+      if (activo) void fetchClases();
     };
-
-    void cargar();
-    const intervalId = window.setInterval(() => {
-      void cargar();
-    }, 30000);
+    actualizar();
+    const intervalId = window.setInterval(actualizar, 30000);
 
     return () => {
-      desmontado = true;
+      activo = false;
+      requestIdRef.current += 1;
       window.clearInterval(intervalId);
     };
-  }, [incluirPasadas]);
+  }, [fetchClases]);
 
-  const clasesDeSede = sedeSeleccionada
-    ? clases.filter((clase) => Number(clase.idSede) === Number(sedeSeleccionada.id))
-    : clases;
+  const cargarInscriptos = useCallback(async (idClase) => {
+    const key = String(idClase);
+    setCargandoInscriptosPorClase((actuales) => ({ ...actuales, [key]: true }));
+    setErrorInscriptosPorClase((actuales) => ({ ...actuales, [key]: null }));
+
+    try {
+      const resultado = await getInscripcionesClase(idClase);
+      setInscriptosPorClase((actuales) => ({
+        ...actuales,
+        [key]: toList(resultado)
+      }));
+    } catch (err) {
+      setErrorInscriptosPorClase((actuales) => ({
+        ...actuales,
+        [key]: err.message
+      }));
+    } finally {
+      setCargandoInscriptosPorClase((actuales) => ({
+        ...actuales,
+        [key]: false
+      }));
+    }
+  }, []);
 
   const runAction = async (nombre, id, action) => {
     const key = `${nombre}:${id}`;
@@ -105,10 +136,15 @@ export const useClases = ({ incluirPasadas = false } = {}) => {
   const aceptarOferta = (id) => runAction('aceptar-oferta', id, () => aceptarOfertaListaEspera(id));
 
   return {
-    clases: clasesDeSede,
+    clases,
     loading,
+    hasLoaded,
     error,
     actionError,
+    inscriptosPorClase,
+    cargandoInscriptosPorClase,
+    errorInscriptosPorClase,
+    cargarInscriptos,
     fetchClases,
     isActionPending,
     addClase,

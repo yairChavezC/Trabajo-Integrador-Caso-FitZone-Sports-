@@ -1,5 +1,9 @@
+const ZONA_HORARIA_ARGENTINA = 'America/Argentina/Buenos_Aires';
+
 export const formatoFecha = (fecha) =>
   new Intl.DateTimeFormat('es-AR', {
+    timeZone: ZONA_HORARIA_ARGENTINA,
+    hourCycle: 'h23',
     weekday: 'long',
     year: 'numeric',
     month: 'short',
@@ -9,7 +13,19 @@ export const formatoFecha = (fecha) =>
   }).format(new Date(fecha));
 
 export const formatoHora = (fecha) =>
-  new Intl.DateTimeFormat('es-AR', { timeStyle: 'short' }).format(new Date(fecha));
+  new Intl.DateTimeFormat('es-AR', {
+    timeZone: ZONA_HORARIA_ARGENTINA,
+    hourCycle: 'h23',
+    timeStyle: 'short'
+  }).format(new Date(fecha));
+
+export const formatoFechaHora = (fecha) =>
+  new Intl.DateTimeFormat('es-AR', {
+    timeZone: ZONA_HORARIA_ARGENTINA,
+    hourCycle: 'h23',
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(fecha));
 
 export const estadoLabel = (inscripcion) => {
   if (!inscripcion) return null;
@@ -22,5 +38,6 @@ export const estadoLabel = (inscripcion) => {
   if (inscripcion.estado === 'notificado') {
     return `Tenés un lugar ofrecido hasta ${formatoFecha(inscripcion.fechaExpiracionOferta)}`;
   }
+  if (inscripcion.estado === 'cancelado_tarde') return 'Cancelado (tardío)';
   return inscripcion.estado;
 };
