@@ -1,1 +1,6 @@
 backend/coverage/
+fitzone_local.sql
+node_modules/
+.env
+.env.local
+.kilo/
