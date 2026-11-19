@@ -29,6 +29,12 @@ test('Concurrencia - Módulo 3: no sobreventa de cupo en reservas de clases grup
     import('./services/inscriptionService.js')
   ]);
 
+  // Las columnas de fecha son TIMESTAMP WITHOUT TIME ZONE interpretadas como
+  // hora de Buenos Aires por el repositorio. El INSERT directo debe respetar
+  // esa convencion para no depender de la zona horaria del runner.
+  const zonaAr = 'America/Argentina/Buenos_Aires';
+  const aHoraAr = (fecha) => fecha.toLocaleString('sv-SE', { timeZone: zonaAr });
+
   const testRunId = `${String(Date.now()).slice(-5)}${Math.floor(Math.random() * 10)}`;
   const testDnis = [`88${testRunId}1`, `88${testRunId}2`];
   const userIds = [];
@@ -74,7 +80,7 @@ test('Concurrencia - Módulo 3: no sobreventa de cupo en reservas de clases grup
       `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
        VALUES ($1, $2, 'Profesor Concurrencia', 1, $3, $4)
        RETURNING id`,
-      [idSede, `Clase Concurrencia ${testRunId}`, fechaInicio, fechaFin]
+      [idSede, `Clase Concurrencia ${testRunId}`, aHoraAr(fechaInicio), aHoraAr(fechaFin)]
     );
     const idClase = cRows[0].id;
     testClassIds.push(idClase);

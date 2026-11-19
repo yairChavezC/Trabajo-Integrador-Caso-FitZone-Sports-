@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BusinessError } from './errors.js';
@@ -49,6 +49,13 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
     import('./services/inscriptionService.js')
   ]);
   const activityController = await import('./controllers/activityController.js');
+
+  // Las columnas fecha_inicio/fecha_fin son TIMESTAMP WITHOUT TIME ZONE y el
+  // repositorio las interpreta como hora de Buenos Aires (AT TIME ZONE en las
+  // consultas). Los INSERT directos de este test deben respetar esa misma
+  // convencion, si no el resultado depende de la zona horaria del runner.
+  const zonaAr = 'America/Argentina/Buenos_Aires';
+  const aHoraAr = (fecha) => fecha.toLocaleString('sv-SE', { timeZone: zonaAr });
 
   // Generador de IDs únicos para datos de prueba aislados
   const testRunId = `${String(Date.now()).slice(-5)}${Math.floor(Math.random() * 10)}`;
@@ -137,7 +144,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
       `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
        VALUES ($1, $2, 'Profesor Test', 1, $3, $4)
        RETURNING id, cupo, fecha_inicio AS "fechaInicio"`,
-      [idSede, `Clase Test Integ ${testRunId}`, fechaInicio, fechaFin]
+      [idSede, `Clase Test Integ ${testRunId}`, aHoraAr(fechaInicio), aHoraAr(fechaFin)]
     );
     testClassId = cRows[0].id;
     testClassIds.push(testClassId);
@@ -347,7 +354,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
         `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
          VALUES ($1, $2, 'Profe Concurrente', 1, $3, $4)
          RETURNING id`,
-        [idSede, `Concurrencia Test ${testRunId}`, fInicio, fFin]
+        [idSede, `Concurrencia Test ${testRunId}`, aHoraAr(fInicio), aHoraAr(fFin)]
       );
       const concClaseId = clRows[0].id;
       testClassIds.push(concClaseId);
@@ -556,7 +563,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
         `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
          VALUES ($1, $2, 'Profesor Historial', 1, $3, $4)
          RETURNING id`,
-        [idSede, `Clase con espera ${testRunId}`, fechaInicioEspera, fechaFinEspera]
+        [idSede, `Clase con espera ${testRunId}`, aHoraAr(fechaInicioEspera), aHoraAr(fechaFinEspera)]
       );
       const claseConEsperaId = claseRows[0].id;
       testClassIds.push(claseConEsperaId);
@@ -598,7 +605,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
         `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
          VALUES ($1, $2, 'Profesor Corto', 1, $3, $4)
          RETURNING id`,
-        [idSede, `Clase Corto ${testRunId}`, fInicioCorto, fFinCorto]
+        [idSede, `Clase Corto ${testRunId}`, aHoraAr(fInicioCorto), aHoraAr(fFinCorto)]
       );
       const idClaseCorto = cRowsCorto[0].id;
       testClassIds.push(idClaseCorto);
@@ -619,7 +626,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
         `INSERT INTO public.clase_grupal (id_sede, nombre, profesor, cupo, fecha_inicio, fecha_fin)
          VALUES ($1, $2, 'Profesor Corto 2', 1, $3, $4)
          RETURNING id`,
-        [idSede, `Clase Corto 2 ${testRunId}`, fInicioCorto2, fFinCorto2]
+        [idSede, `Clase Corto 2 ${testRunId}`, aHoraAr(fInicioCorto2), aHoraAr(fFinCorto2)]
       );
       const idClaseCorto2 = cRowsCorto2[0].id;
       testClassIds.push(idClaseCorto2);
