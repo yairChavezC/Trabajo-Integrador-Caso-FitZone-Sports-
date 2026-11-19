@@ -33,7 +33,7 @@ export const useLogin = () => {
       login(data);
 
       // 3. Redirigimos a la vista inicial autenticada
-      navigate('/canchas', { replace: true });
+      navigate('/acceso', { replace: true });
     } catch (err) {
       setError(err.message || 'Error de conexión');
     } finally {

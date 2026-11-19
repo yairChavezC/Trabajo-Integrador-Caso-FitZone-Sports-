@@ -15,7 +15,7 @@ import { authRoutes } from './modules/auth/routes';
 import { canchasRoutes } from './modules/canchas/routes';
 import { accesoRoutes } from './modules/acceso/routes';
 import { clasesRoutes } from './modules/clases/routes';
-import { pagosRoutes } from './modules/pagos/routes';
+
 import { sociosRoutes } from './modules/socios/routes';
 
 export default function App() {
@@ -27,13 +27,13 @@ export default function App() {
             {/* Rutas privadas bajo layout general */}
             <Route path="/" element={<ProtectedRoute><SedeProvider><MainLayout /></SedeProvider></ProtectedRoute>}>
               {/* Redirección inicial al entrar a "/" */}
-              <Route index element={<Navigate to="/canchas" replace />} />
+              <Route index element={<Navigate to="/acceso" replace />} />
 
               {/* Rutas de cada módulo */}
               {canchasRoutes}
               {accesoRoutes}
               {clasesRoutes}
-              {pagosRoutes}
+
               {sociosRoutes}
             </Route>
 

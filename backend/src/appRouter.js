@@ -1,35 +1,31 @@
 import { Router } from 'express';
-import authRoutes from './modules/auth/authRoutes.js';
+import authRoutes from './modules/auth/auth.module.js';
 import sedeRoutes from './modules/sedes/routes/sedeRoutes.js';
-import canchasRoutes from './modules/canchas/routes/canchasRoutes.js';
+import canchasRoutes, { reservaCanchaRouter } from './modules/canchas/canchas.module.js';
 import { verificarToken } from './core/middlewares/authMiddleware.js'; 
 import accessRoutes from './modules/accesses/routes/accessRoutes.js';
 import paymentRoutes from './modules/payments/routes/paymentRoutes.js';
 import activityRoutes from './modules/activities/routes/activityRoutes.js';
-import usersRoutes from './modules/users/users.routes.js';
-import plansRoutes from './modules/memberships/plans.routes.js';
-import reservaCanchaRoutes from './modules/reservaCancha/reservaCanchaRoutes.js';
-import subscriptionsRoutes from './modules/memberships/subscriptions.routes.js';
+import { usersRouter } from './modules/users/users.module.js';
+import { plansRouter, subscriptionsRouter } from './modules/memberships/memberships.module.js';
 
 const router = Router();
 
-//RUTAS PÚBLICAS (No piden token)
+// RUTAS PÚBLICAS (No piden token)
 router.use('/auth', authRoutes);
 
-
-
-//A partir de esta línea, cualquier ruta definida abajo exige token obligatorio
+// A partir de esta línea, cualquier ruta definida abajo exige token obligatorio
 router.use(verificarToken);
 
-//RUTAS PROTEGIDAS (Exigen token)
+// RUTAS PROTEGIDAS (Exigen token)
 router.use('/sedes', sedeRoutes);
 router.use('/canchas', canchasRoutes);
-router.use('/reservas-canchas', reservaCanchaRoutes);
+router.use('/reservas-canchas', reservaCanchaRouter);
 router.use('/accesses', accessRoutes);
-router.use('/payments', paymentRoutes); // <-- Protegido nuevamente abajo de la barrera
+router.use('/payments', paymentRoutes);
 router.use('/clases', activityRoutes);
-router.use('/users', usersRoutes);
-router.use('/plans', plansRoutes);
-router.use('/memberships', subscriptionsRoutes);
+router.use('/users', usersRouter);
+router.use('/plans', plansRouter);
+router.use('/memberships', subscriptionsRouter);
 
 export default router;

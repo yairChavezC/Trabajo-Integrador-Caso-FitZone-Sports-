@@ -2,10 +2,52 @@ import { httpClient } from '../../../core/api/httpClient.js';
 
 const STORAGE_PADRON_KEY = 'fitzone_padron_offline';
 const STORAGE_COLA_KEY = 'fitzone_cola_accesos_offline';
+const STORAGE_SEDES_KEY = 'fitzone_sedes_offline';
+const STORAGE_USUARIO_KEY = 'usuario';
 const STORAGE_ESTADO_SEDE_PREFIX = 'fitzone_estado_sede_';
 const TIEMPO_EXPIRACION_QR_MS = 65 * 1000;
+const TOLERANCIA_DESFASE_MS = -10 * 1000;
+const ROL_CLIENTE_EXTERNO = 2;
 
 let promesaSincronizacion = null;
+
+/**
+ * Patrón Adapter (Unidad III / ADR-006):
+ * Encapsula la API de almacenamiento del navegador (localStorage).
+ * Si en el futuro se migra la persistencia local a IndexedDB, solo cambia este adaptador.
+ */
+const offlineStorageAdapter = {
+    obtenerPadron() {
+        return JSON.parse(localStorage.getItem(STORAGE_PADRON_KEY) || '{"socios":[]}');
+    },
+    guardarPadron(padron) {
+        localStorage.setItem(STORAGE_PADRON_KEY, JSON.stringify(padron));
+    },
+    obtenerCola() {
+        return JSON.parse(localStorage.getItem(STORAGE_COLA_KEY) || '[]');
+    },
+    guardarCola(cola) {
+        localStorage.setItem(STORAGE_COLA_KEY, JSON.stringify(cola));
+    },
+    limpiarCola() {
+        localStorage.removeItem(STORAGE_COLA_KEY);
+    },
+    obtenerEstadoSede(sedeId) {
+        const raw = localStorage.getItem(`${STORAGE_ESTADO_SEDE_PREFIX}${sedeId}`);
+        return raw ? JSON.parse(raw) : { aforoActual: 0, aforoMaximo: 100, ultimosMovimientos: [] };
+    },
+    guardarEstadoSede(sedeId, estado) {
+        localStorage.setItem(`${STORAGE_ESTADO_SEDE_PREFIX}${sedeId}`, JSON.stringify(estado));
+    },
+    obtenerCupoCatalogoSede(sedeId, fallback = 100) {
+        const sedes = JSON.parse(localStorage.getItem(STORAGE_SEDES_KEY) || '[]');
+        const sede = sedes.find(s => Number(s.id) === Number(sedeId));
+        return Number(sede?.cupo) || Number(fallback) || 100;
+    },
+    obtenerUsuarioSesion() {
+        return JSON.parse(localStorage.getItem(STORAGE_USUARIO_KEY) || '{}');
+    }
+};
 
 const esErrorDeRed = (error) => {
     const msg = error?.message || '';
@@ -19,7 +61,29 @@ const esErrorDeRed = (error) => {
     );
 };
 
+const parsearYValidarQR = (qrCode) => {
+    if (!qrCode || typeof qrCode !== 'string') {
+        throw new Error('El código QR es inválido.');
+    }
+    const partes = qrCode.trim().split('-');
+    if (partes.length < 3 || partes[0] !== 'FITZONE') {
+        throw new Error('Formato de código QR no reconocido por FitZone.');
+    }
+    const userId = Number(partes[1]);
+    const timestamp = Number(partes[2]);
+    const antiguedadMs = Date.now() - timestamp;
+
+    if (isNaN(timestamp) || antiguedadMs > TIEMPO_EXPIRACION_QR_MS || antiguedadMs < TOLERANCIA_DESFASE_MS) {
+        throw new Error('Código QR expirado. Por favor, utilice el código actual en su pantalla.');
+    }
+    return { userId, timestamp };
+};
+
 export const accesoService = {
+    obtenerUsuarioActual: () => {
+        return offlineStorageAdapter.obtenerUsuarioSesion();
+    },
+
     /**
      * Descarga y guarda en localStorage el padrón de socios para contingencia offline (RNF-01).
      */
@@ -28,39 +92,23 @@ export const accesoService = {
             const response = await httpClient.get('/accesses/padron-offline');
             const payload = response?.data || response;
             if (payload && Array.isArray(payload.socios)) {
-                localStorage.setItem(STORAGE_PADRON_KEY, JSON.stringify(payload));
+                offlineStorageAdapter.guardarPadron(payload);
                 console.info(`✅ [Modo Offline] Padrón sincronizado (${payload.socios.length} socios).`);
             }
             return payload;
         } catch (error) {
-            return JSON.parse(localStorage.getItem(STORAGE_PADRON_KEY) || 'null');
+            return offlineStorageAdapter.obtenerPadron();
         }
     },
 
     /**
-     * Valida un código QR localmente contra la réplica guardada en el terminal de sede (RNF-01).
+     * Valida un código QR localmente contra la réplica guardada en el terminal de sede (RNF-01 / ADR-006).
      */
     validarEscaneoLocalOffline: (qrCode, sedeId) => {
-        if (!qrCode || typeof qrCode !== 'string') {
-            throw new Error('El código QR es inválido.');
-        }
+        const { userId } = parsearYValidarQR(qrCode);
 
-        const partes = qrCode.trim().split('-');
-        if (partes.length < 3 || partes[0] !== 'FITZONE') {
-            throw new Error('Formato de código QR no reconocido por FitZone.');
-        }
-
-        const userId = Number(partes[1]);
-        const timestamp = Number(partes[2]);
-        const antiguedadMs = Date.now() - timestamp;
-
-        if (isNaN(timestamp) || antiguedadMs > TIEMPO_EXPIRACION_QR_MS || antiguedadMs < -10000) {
-            throw new Error('Código QR expirado. Por favor, utilice el código actual en su pantalla.');
-        }
-
-        const padronData = JSON.parse(localStorage.getItem(STORAGE_PADRON_KEY) || '{"socios":[]}');
+        const padronData = offlineStorageAdapter.obtenerPadron();
         const socioIndex = padronData.socios.findIndex(s => Number(s.id) === userId);
-
         if (socioIndex === -1) {
             throw new Error('Socio no encontrado en el padrón local de contingencia.');
         }
@@ -71,16 +119,28 @@ export const accesoService = {
             throw new Error('Acceso denegado: El socio no posee una membresía activa.');
         }
 
-        const tipoAccion = socio.esta_adentro ? 'salida' : 'ingreso';
-        const fechaEvento = new Date().toISOString();
         const sedeIdNorm = Number(sedeId) || 1;
 
-        // 1. Invertimos el estado en el padrón local
-        padronData.socios[socioIndex].esta_adentro = !socio.esta_adentro;
-        localStorage.setItem(STORAGE_PADRON_KEY, JSON.stringify(padronData));
+        if (socio.esta_adentro && socio.id_sede_activa && Number(socio.id_sede_activa) !== sedeIdNorm) {
+            throw new Error('Acceso denegado: El socio ya registra un ingreso activo en otra sucursal (RN-01).');
+        }
 
-        // 2. Guardamos el evento en la cola local
-        const colaActual = JSON.parse(localStorage.getItem(STORAGE_COLA_KEY) || '[]');
+        const tipoAccion = socio.esta_adentro ? 'salida' : 'ingreso';
+        const fechaEvento = new Date().toISOString();
+
+        const estadoSedeLocal = offlineStorageAdapter.obtenerEstadoSede(sedeIdNorm);
+        const cupoMaximoSede = offlineStorageAdapter.obtenerCupoCatalogoSede(sedeIdNorm, estadoSedeLocal.aforoMaximo);
+        const aforoPrevio = Number(estadoSedeLocal.aforoActual) || 0;
+
+        if (tipoAccion === 'ingreso' && Number(socio.id_rol) !== ROL_CLIENTE_EXTERNO && aforoPrevio >= cupoMaximoSede) {
+            throw new Error('Acceso denegado: La sucursal ha alcanzado su capacidad máxima de aforo.');
+        }
+
+        padronData.socios[socioIndex].esta_adentro = !socio.esta_adentro;
+        padronData.socios[socioIndex].id_sede_activa = tipoAccion === 'ingreso' ? sedeIdNorm : null;
+        offlineStorageAdapter.guardarPadron(padronData);
+
+        const colaActual = offlineStorageAdapter.obtenerCola();
         colaActual.push({
             idLocal: `OFF-${Date.now()}-${userId}`,
             usuarioId: socio.id,
@@ -89,21 +149,14 @@ export const accesoService = {
             tipoAccion,
             fechaEvento
         });
-        localStorage.setItem(STORAGE_COLA_KEY, JSON.stringify(colaActual));
+        offlineStorageAdapter.guardarCola(colaActual);
 
-        // 3. Actualizamos el estado local de la sede en localStorage
-        const keySede = `${STORAGE_ESTADO_SEDE_PREFIX}${sedeIdNorm}`;
-        const estadoSedeLocal = JSON.parse(
-            localStorage.getItem(keySede) || '{"aforoActual":0,"aforoMaximo":100,"ultimosMovimientos":[]}'
-        );
-
-        const aforoPrevio = Number(estadoSedeLocal.aforoActual) || 0;
-        // Solo sumamos/restamos aforo si no es cliente externo (rol != 2)
-        if (Number(socio.id_rol) !== 2) {
+        if (Number(socio.id_rol) !== ROL_CLIENTE_EXTERNO) {
             estadoSedeLocal.aforoActual = tipoAccion === 'salida' 
                 ? Math.max(0, aforoPrevio - 1) 
                 : aforoPrevio + 1;
         }
+        estadoSedeLocal.aforoMaximo = cupoMaximoSede;
 
         const nuevoMov = {
             id: `OFF-MOV-${Date.now()}`,
@@ -117,9 +170,7 @@ export const accesoService = {
             ...(Array.isArray(estadoSedeLocal.ultimosMovimientos) ? estadoSedeLocal.ultimosMovimientos : [])
         ].slice(0, 5);
 
-        localStorage.setItem(keySede, JSON.stringify(estadoSedeLocal));
-
-        console.info(`⚡ [Modo Offline] ${tipoAccion.toUpperCase()} validado localmente (${socio.nombre}). Aforo local: ${estadoSedeLocal.aforoActual}. Pendientes: ${colaActual.length}`);
+        offlineStorageAdapter.guardarEstadoSede(sedeIdNorm, estadoSedeLocal);
 
         return {
             autorizado: true,
@@ -129,27 +180,27 @@ export const accesoService = {
             usuarioId: socio.id,
             nombreSocio: socio.nombre,
             aforoActual: estadoSedeLocal.aforoActual,
-            aforoMaximo: estadoSedeLocal.aforoMaximo || 100,
+            aforoMaximo: cupoMaximoSede,
             ultimosMovimientos: estadoSedeLocal.ultimosMovimientos,
             horaIngreso: fechaEvento
         };
     },
 
     /**
-     * Sincroniza la cola offline con el backend y espera a que termine antes de liberar la promesa.
+     * Sincroniza la cola offline con el backend con cerrojo de concurrencia (ADR-007).
      */
     sincronizarColaOffline: async () => {
         if (promesaSincronizacion) {
             return promesaSincronizacion;
         }
 
-        const cola = JSON.parse(localStorage.getItem(STORAGE_COLA_KEY) || '[]');
+        const cola = offlineStorageAdapter.obtenerCola();
         if (cola.length === 0) return { procesados: 0 };
 
         promesaSincronizacion = (async () => {
             try {
                 const response = await httpClient.post('/accesses/sincronizar-offline', { eventos: cola });
-                localStorage.removeItem(STORAGE_COLA_KEY);
+                offlineStorageAdapter.limpiarCola();
                 console.info(`🔄 [Modo Offline] ${cola.length} accesos offline sincronizados con la base de datos.`);
                 return response?.data || response;
             } finally {
@@ -162,10 +213,7 @@ export const accesoService = {
 
     registrarIngreso: async (qrCode, sedeId) => {
         try {
-            const response = await httpClient.post('/accesses/ingreso', {
-                qrCode,
-                sedeId
-            });
+            const response = await httpClient.post('/accesses/ingreso', { qrCode, sedeId });
             return response.data;
         } catch (error) {
             const mensajeError = error.response?.data?.mensaje || error.message || 'Error al procesar el ingreso.';
@@ -173,17 +221,10 @@ export const accesoService = {
         }
     },
 
-    /**
-     * Intenta escanear en el servidor; si da error de red, valida en modo offline directo.
-     */
     registrarEscaneo: async (qrCode, sedeId) => {
         try {
             await accesoService.sincronizarColaOffline();
-
-            const response = await httpClient.post('/accesses/scan', {
-                qrCode,
-                sedeId
-            });
+            const response = await httpClient.post('/accesses/scan', { qrCode, sedeId });
             return response.data;
         } catch (error) {
             if (esErrorDeRed(error)) {
@@ -196,10 +237,7 @@ export const accesoService = {
 
     registrarIngresoExterno: async (datosSocio, sedeId) => {
         try {
-            const response = await httpClient.post('/accesses/externo', { 
-                ...datosSocio, 
-                sedeId 
-            });
+            const response = await httpClient.post('/accesses/externo', { ...datosSocio, sedeId });
             return response.data;
         } catch (error) {
             const mensajeError = error.response?.data?.mensaje || error.message || 'Error al registrar el ingreso del cliente externo.';
@@ -207,40 +245,23 @@ export const accesoService = {
         }
     },
 
-    /**
-     * Obtiene el estado de la sede en una secuencia estricta:
-     * 1. Sincroniza cola offline (si hay).
-     * 2. Pide estado actualizado a PostgreSQL.
-     * 3. Actualiza el padrón local.
-     * Si cualquiera falla por red, devuelve el estado local guardado en localStorage sin pisarlo.
-     */
     obtenerEstadoSede: async (sedeId) => {
         const sedeIdNorm = Number(sedeId) || 1;
-        const keySede = `${STORAGE_ESTADO_SEDE_PREFIX}${sedeIdNorm}`;
         try {
-            // Paso 1: Si había accesos offline, obligamos a que terminen de insertarse en la BD
             await accesoService.sincronizarColaOffline();
 
-            // Paso 2: Recién cuando terminó el paso 1, consultamos el aforo e historial en la BD
             const response = await httpClient.get(`/accesses/estado/${sedeIdNorm}`);
             const data = response?.data?.data || response?.data || response;
 
-            // Solo guardamos en localStorage si la cola offline ya está vacía
-            const colaRestante = JSON.parse(localStorage.getItem(STORAGE_COLA_KEY) || '[]');
+            const colaRestante = offlineStorageAdapter.obtenerCola();
             if (data && colaRestante.length === 0) {
-                localStorage.setItem(keySede, JSON.stringify(data));
+                offlineStorageAdapter.guardarEstadoSede(sedeIdNorm, data);
             }
 
-            // Paso 3: Actualizamos el padrón offline con los nuevos estados de PostgreSQL
             await accesoService.actualizarReplicaLocal();
-
             return data;
         } catch (error) {
-            const estadoRespaldo = localStorage.getItem(keySede);
-            if (estadoRespaldo) {
-                return JSON.parse(estadoRespaldo);
-            }
-            return { aforoActual: 0, aforoMaximo: 100, ultimosMovimientos: [] };
+            return offlineStorageAdapter.obtenerEstadoSede(sedeIdNorm);
         }
     },
 
@@ -251,6 +272,63 @@ export const accesoService = {
         } catch (error) {
             const mensajeError = error.response?.data?.mensaje || error.message || 'Error al obtener el historial de accesos.';
             throw new Error(mensajeError);
+        }
+    },
+
+    obtenerMisReservasCanchas: async () => {
+        try {
+            const response = await httpClient.get('/reservas-canchas/mis-reservas');
+            const lista = Array.isArray(response)
+                ? response
+                : response?.data?.data || response?.data || [];
+            return Array.isArray(lista) ? lista.slice(0, 5) : [];
+        } catch (error) {
+            return [];
+        }
+    },
+
+    obtenerMisInscripcionesClases: async () => {
+        try {
+            const [resInscripciones, resClases] = await Promise.all([
+                httpClient.get('/clases/mis-inscripciones').catch(() => []),
+                httpClient.get('/clases').catch(() => [])
+            ]);
+
+            // El módulo de clases devuelve el Array directo en la raíz de la respuesta
+            const listaDirecta = Array.isArray(resInscripciones)
+                ? resInscripciones
+                : resInscripciones?.data?.data || resInscripciones?.data || [];
+
+            const catalogoClases = Array.isArray(resClases)
+                ? resClases
+                : resClases?.data?.data || resClases?.data || [];
+
+            const desdeCatalogo = Array.isArray(catalogoClases)
+                ? catalogoClases
+                    .filter((c) => Boolean(c.miInscripcion))
+                    .map((c) => ({
+                        idInscripcion: c.miInscripcion.id,
+                        idClase: c.id,
+                        nombreClase: c.nombre,
+                        instructor: c.profesor,
+                        sede: c.sede,
+                        fechaInicio: c.fechaInicio,
+                        fechaFin: c.fechaFin,
+                        estado: c.miInscripcion.estado
+                    }))
+                : [];
+
+            const mapaUnificado = new Map();
+            [...listaDirecta, ...desdeCatalogo].forEach((item) => {
+                const key = item.idClase || item.idInscripcion || item.id;
+                if (key && !mapaUnificado.has(key)) {
+                    mapaUnificado.set(key, item);
+                }
+            });
+
+            return Array.from(mapaUnificado.values()).slice(0, 5);
+        } catch (error) {
+            return [];
         }
     }
 };

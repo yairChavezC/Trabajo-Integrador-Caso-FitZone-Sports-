@@ -1,38 +1,57 @@
 import pool from '../../../config/db.js';
 
+const ROL_CLIENTE_EXTERNO = 2;
+
 /**
- * Busca un usuario a partir de su código QR y normaliza el estado de su suscripción.
+ * Busca un usuario por su ID primario y calcula el estado real de su suscripción
+ * considerando tanto s.estado como s.fecha_proximo_vencimiento y u.activo (RF-02 / RN-03).
  */
-const findUserByQR = async (qrCode) => {
+const findUserById = async (userId) => {
     try {
-        const partes = qrCode.split('-');
-        if (partes.length < 2 || partes[0] !== 'FITZONE') {
-            return null;
-        }
-        
-        const userId = partes[1];
-        
         const query = `
-            SELECT u.*, LOWER(TRIM(s.estado)) AS estado_suscripcion 
+            SELECT 
+                u.*,
+                s.fecha_proximo_vencimiento,
+                CASE
+                    WHEN u.activo = false THEN 'suspendida'
+                    WHEN s.id IS NULL THEN 'inactiva'
+                    WHEN s.fecha_proximo_vencimiento IS NOT NULL AND s.fecha_proximo_vencimiento < CURRENT_DATE THEN 'vencida'
+                    WHEN s.fecha_fin IS NOT NULL AND s.fecha_fin < CURRENT_DATE THEN 'vencida'
+                    ELSE LOWER(TRIM(s.estado))
+                END AS estado_suscripcion
             FROM usuario u 
             LEFT JOIN suscripcion s ON u.id = s.id_usuario 
             WHERE u.id = $1
+            ORDER BY s.id DESC
+            LIMIT 1;
         `;
         const result = await pool.query(query, [userId]);
-        return result.rows[0];
+        return result.rows[0] || null;
     } catch (error) {
-        console.error("Error al buscar usuario por QR:", error);
+        console.error("Error al buscar usuario por ID:", error);
         return null;
     }
 };
 
 /**
- * RN-01: Verifica si el usuario ya se encuentra dentro de alguna sede.
+ * Mantiene compatibilidad si se invoca pasando un userId o un token QR.
+ */
+const findUserByQR = async (qrOrUserId) => {
+    if (qrOrUserId === null || qrOrUserId === undefined) return null;
+    const raw = String(qrOrUserId).trim();
+    const userId = raw.includes('-') ? raw.split('-')[1] : raw;
+    if (!userId || isNaN(Number(userId))) return null;
+    return findUserById(Number(userId));
+};
+
+/**
+ * RN-01: Verifica si el usuario ya se encuentra dentro de alguna sede (fecha_salida IS NULL).
  */
 const checkAccesoActivoGlobal = async (idUserId) => {
     const query = `
-        SELECT id FROM control_acceso 
-        WHERE id_usuario = $1 AND fecha_salida IS NULL;
+        SELECT id, id_sede FROM control_acceso 
+        WHERE id_usuario = $1 AND fecha_salida IS NULL
+        LIMIT 1;
     `;
     const result = await pool.query(query, [idUserId]);
     return result.rows.length > 0;
@@ -54,7 +73,7 @@ const createAccess = async (accessData) => {
 };
 
 /**
- * Registra la salida de un usuario de una sede.
+ * Registra la salida de un usuario en una sede específica.
  */
 const registrarSalida = async (idUserId, idSede, fechaSalida = null) => {
     const query = `
@@ -65,24 +84,23 @@ const registrarSalida = async (idUserId, idSede, fechaSalida = null) => {
     `;
     const values = [fechaSalida ? new Date(fechaSalida) : new Date(), idUserId, idSede];
     const result = await pool.query(query, values);
-    return result.rows[0]; 
+    return result.rows[0] || null; 
 };
 
 /**
  * RF-05: Obtiene el aforo actual de una sede específica.
- * REGLA: Los clientes externos (id_rol = 2) NO suman al aforo.
+ * Los clientes externos (id_rol = 2) no consumen cupo de gimnasio de socios.
  */
 const getAforoPorSede = async (idSede) => {
     const query = `
-        SELECT COUNT(*) as personas_adentro 
+        SELECT COUNT(*) AS personas_adentro 
         FROM control_acceso ca
         JOIN usuario u ON ca.id_usuario = u.id
         WHERE ca.id_sede = $1 
           AND ca.fecha_salida IS NULL
-          AND u.id_rol != 2;
+          AND u.id_rol != $2;
     `;
-    const values = [idSede];
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, [idSede, ROL_CLIENTE_EXTERNO]);
     return parseInt(result.rows[0].personas_adentro, 10);
 };
 
@@ -104,7 +122,6 @@ const getUltimosMovimientosPorSede = async (idSede, limite = 5) => {
             ORDER BY COALESCE(ca.fecha_salida, ca.fecha_entrada) DESC
             LIMIT $2;
         `;
-        
         const result = await pool.query(query, [idSede, limite]);
         return result.rows;
     } catch (error) {
@@ -114,13 +131,29 @@ const getUltimosMovimientosPorSede = async (idSede, limite = 5) => {
 };
 
 /**
- * Busca un usuario por DNI para evitar crear duplicados de clientes externos.
+ * Busca un usuario por DNI (ignorando espacios laterales) para validar si ya existe.
  */
 const findUserByDni = async (dni) => {
     try {
-        const query = `SELECT * FROM usuario WHERE dni = $1 LIMIT 1;`;
-        const result = await pool.query(query, [dni]);
-        return result.rows[0];
+        const dniLimpio = String(dni || '').trim();
+        const query = `
+            SELECT 
+                u.*,
+                s.fecha_proximo_vencimiento,
+                CASE
+                    WHEN u.activo = false THEN 'suspendida'
+                    WHEN s.id IS NULL THEN 'inactiva'
+                    WHEN s.fecha_proximo_vencimiento IS NOT NULL AND s.fecha_proximo_vencimiento < CURRENT_DATE THEN 'vencida'
+                    ELSE LOWER(TRIM(s.estado))
+                END AS estado_suscripcion
+            FROM usuario u
+            LEFT JOIN suscripcion s ON u.id = s.id_usuario
+            WHERE TRIM(u.dni) = $1
+            ORDER BY s.id DESC
+            LIMIT 1;
+        `;
+        const result = await pool.query(query, [dniLimpio]);
+        return result.rows[0] || null;
     } catch (error) {
         console.error("Error al buscar usuario por DNI:", error);
         return null;
@@ -128,17 +161,21 @@ const findUserByDni = async (dni) => {
 };
 
 /**
- * Crea el perfil del cliente externo en la tabla de usuarios de PostgreSQL.
+ * Crea el perfil del cliente externo en la tabla usuario cumpliendo las restricciones NOT NULL y UNIQUE.
  */
 const createUserPublic = async (userData) => {
-    const { nombre, dni, id_rol } = userData;
+    const { nombre, dni, id_rol, contacto } = userData;
+    const dniLimpio = String(dni).trim();
+    const nombreLimpio = String(nombre).trim();
+    const contactoFinal = contacto || `externo.${dniLimpio}@fitzone.com`;
+
     try {
         const query = `
-            INSERT INTO usuario (nombre, dni, id_rol, contacto)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *;
+            INSERT INTO usuario (nombre, dni, contacto, password, id_rol, activo)
+            VALUES ($1, $2, $3, encode(digest($4, 'sha256'), 'hex'), $5, true)
+            RETURNING id, nombre, dni, contacto, id_rol, activo;
         `;
-        const values = [nombre, dni, id_rol, '-']; 
+        const values = [nombreLimpio, dniLimpio, contactoFinal, dniLimpio, id_rol || ROL_CLIENTE_EXTERNO]; 
         const result = await pool.query(query, values);
         return result.rows[0];
     } catch (error) {
@@ -157,7 +194,7 @@ const getHistorialByUser = async (userId) => {
                 ca.id, 
                 ca.fecha_entrada, 
                 ca.fecha_salida,
-                s.nombre as sede_nombre
+                s.nombre AS sede_nombre
             FROM control_acceso ca
             LEFT JOIN sede s ON ca.id_sede = s.id
             WHERE ca.id_usuario = $1
@@ -179,51 +216,79 @@ const getHistorialByUser = async (userId) => {
 };
 
 /**
- * RNF-01: Obtiene el padrón de socios y su estado actual para la réplica local de la terminal.
+ * RNF-01: Obtiene el padrón resumido de usuarios y su estado real de membresía/presencia
+ * considerando fecha_proximo_vencimiento para la réplica local offline.
  */
 const getPadronOffline = async () => {
     try {
-        const queryUsuarios = `
+        const query = `
             SELECT 
                 u.id, 
+                u.dni, 
                 u.nombre, 
                 u.id_rol,
-                LOWER(TRIM(s.estado)) AS estado_suscripcion
+                COALESCE(
+                    (SELECT 
+                        CASE
+                            WHEN u.activo = false THEN 'suspendida'
+                            WHEN s.fecha_proximo_vencimiento IS NOT NULL AND s.fecha_proximo_vencimiento < CURRENT_DATE THEN 'vencida'
+                            WHEN s.fecha_fin IS NOT NULL AND s.fecha_fin < CURRENT_DATE THEN 'vencida'
+                            ELSE LOWER(TRIM(s.estado))
+                        END
+                     FROM suscripcion s 
+                     WHERE s.id_usuario = u.id 
+                     ORDER BY s.id DESC 
+                     LIMIT 1), 
+                    'inactiva'
+                ) AS estado_suscripcion,
+                EXISTS (
+                    SELECT 1 
+                    FROM control_acceso ca 
+                    WHERE ca.id_usuario = u.id 
+                      AND ca.fecha_salida IS NULL
+                ) AS esta_adentro,
+                (
+                    SELECT ca.id_sede 
+                    FROM control_acceso ca 
+                    WHERE ca.id_usuario = u.id 
+                      AND ca.fecha_salida IS NULL 
+                    ORDER BY ca.fecha_entrada DESC 
+                    LIMIT 1
+                ) AS id_sede_activa
             FROM usuario u
-            LEFT JOIN suscripcion s ON u.id = s.id_usuario
+            WHERE u.activo = true;
         `;
-        const queryAdentro = `
-            SELECT DISTINCT id_usuario 
-            FROM control_acceso 
-            WHERE fecha_salida IS NULL
-        `;
-
-        const [resUsuarios, resAdentro] = await Promise.all([
-            pool.query(queryUsuarios),
-            pool.query(queryAdentro)
-        ]);
-
-        const usuariosAdentroSet = new Set(resAdentro.rows.map(r => Number(r.id_usuario)));
-
-        return resUsuarios.rows.map(u => ({
-            id: u.id,
-            nombre: u.nombre,
-            id_rol: u.id_rol,
-            estado_suscripcion: u.estado_suscripcion || 'inactiva',
-            esta_adentro: usuariosAdentroSet.has(Number(u.id))
-        }));
+        const result = await pool.query(query);
+        return result.rows;
     } catch (error) {
-        console.error("Error en getPadronOffline:", error);
-        return [];
+        console.error("Error al obtener padrón offline en el repositorio:", error);
+        throw error;
+    }
+};
+
+/**
+ * RF-05: Obtiene el valor crudo de capacidad máxima (cupo) configurado para una sede en la BD.
+ */
+const getCupoSede = async (idSede) => {
+    try {
+        const query = `SELECT cupo FROM sede WHERE id = $1 LIMIT 1;`;
+        const result = await pool.query(query, [idSede]);
+        const cupo = Number(result.rows[0]?.cupo);
+        return cupo > 0 ? cupo : null;
+    } catch (error) {
+        console.error("Error al obtener cupo de la sede:", error);
+        return null;
     }
 };
 
 export default {
+    findUserById,
     findUserByQR,
     checkAccesoActivoGlobal,
     createAccess,
     registrarSalida, 
     getAforoPorSede,
+    getCupoSede,
     getUltimosMovimientosPorSede,
     findUserByDni,
     createUserPublic,
