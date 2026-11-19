@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
-import activityRouter, { createRequireAgendaManager } from './activityRoutes.js';
+import {
+  createRequireAgendaManager,
+  createRequireRoles
+} from './activityRoutes.js';
+import {
+  createGetActivitiesController,
+  createGetActivityByIdController
+} from '../controllers/activityController.js';
 
-// Simulador de request y respuesta para probar autorización de rutas
 const createMockReqRes = (usuario, method = 'GET', path = '/', body = {}, params = {}) => {
   const req = {
     method,
@@ -32,79 +37,134 @@ const createMockReqRes = (usuario, method = 'GET', path = '/', body = {}, params
   return { req, res };
 };
 
-test('Permisos Módulo 3: Cliente externo es bloqueado de la agenda de clases', async () => {
-  const app = express();
-  app.use(express.json());
-  // Simular middleware de auth que inyecta usuario con rol de cliente_externo (id_rol = 2)
-  app.use((req, res, next) => {
-    req.usuario = { id: 9, rol: 2 }; // cliente_externo
-    next();
+const runMiddleware = async (middleware, usuario, method = 'GET', path = '/', body = {}, params = {}) => {
+  const { req, res } = createMockReqRes(usuario, method, path, body, params);
+  let continued = false;
+  let forwardedError;
+
+  await middleware(req, res, (error) => {
+    if (error) forwardedError = error;
+    else continued = true;
   });
-  app.use('/api/v1/clases', activityRouter);
 
-  // Intentar obtener clases con cliente externo
-  const server = app.listen(0);
-  const port = server.address().port;
+  assert.equal(forwardedError, undefined);
+  return { req, res, continued };
+};
 
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/v1/clases`);
-    assert.equal(response.status, 403);
-    const body = await response.json();
-    assert.match(body.message, /disponible para socios y personal de FitZone/);
-  } finally {
-    server.close();
+const runController = async (controller, req) => {
+  const response = { statusCode: 200, body: null };
+  const res = {
+    status(code) {
+      response.statusCode = code;
+      return this;
+    },
+    json(body) {
+      response.body = body;
+      return this;
+    }
+  };
+  await controller(req, res);
+  return response;
+};
+
+test('Permisos Módulo 3: cliente externo no puede acceder a la agenda', async () => {
+  const requireClassAccess = createRequireRoles(async () => 'cliente_externo')(
+    ['socio', 'recepcionista', 'gerente'],
+    'La agenda de clases está disponible para socios y personal de FitZone.'
+  );
+  const { res, continued } = await runMiddleware(requireClassAccess, { id: 9, rol: 2 });
+
+  assert.equal(res.getStatusCode(), 403);
+  assert.match(res.getResponseData().message, /disponible para socios y personal de FitZone/);
+  assert.equal(continued, false);
+});
+
+test('Permisos Módulo 3: socio puede consultar la agenda, pero no gestionar clases', async () => {
+  const resolveRole = async () => 'socio';
+  const requireClassAccess = createRequireRoles(resolveRole)(
+    ['socio', 'recepcionista', 'gerente'],
+    'La agenda de clases está disponible para socios y personal de FitZone.'
+  );
+  const requireAgendaManager = createRequireAgendaManager({ getCurrentUserRole: resolveRole });
+
+  const agendaResult = await runMiddleware(requireClassAccess, { id: 10, rol: 3 });
+  assert.equal(agendaResult.continued, true);
+
+  for (const method of ['POST', 'PUT', 'DELETE']) {
+    const result = await runMiddleware(
+      requireAgendaManager,
+      { id: 10, rol: 3 },
+      method,
+      method === 'POST' ? '/' : '/1',
+      { idSede: 1 },
+      { id: '1' }
+    );
+    assert.equal(result.res.getStatusCode(), 403, `${method} debe ser rechazado`);
+    assert.equal(result.continued, false);
   }
 });
 
-test('Permisos Módulo 3: Socio no puede crear ni eliminar clases', async () => {
-  const app = express();
-  app.use(express.json());
-  app.use((req, res, next) => {
-    req.usuario = { id: 10, rol: 3 }; // socio
-    next();
-  });
-  app.use('/api/v1/clases', activityRouter);
-
-  const server = app.listen(0);
-  const port = server.address().port;
-
-  try {
-    const postRes = await fetch(`http://127.0.0.1:${port}/api/v1/clases`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: 'Clase Fake' })
-    });
-    assert.equal(postRes.status, 403);
-
-    const delRes = await fetch(`http://127.0.0.1:${port}/api/v1/clases/1`, {
-      method: 'DELETE'
-    });
-    assert.equal(delRes.status, 403);
-  } finally {
-    server.close();
+test('Permisos Módulo 3: solo socios pueden consultar o marcar notificaciones', async () => {
+  for (const tipo of ['gerente', 'recepcionista', 'cliente_externo']) {
+    const requireSocio = createRequireRoles(async () => tipo)(
+      ['socio'],
+      'Solo los socios pueden acceder a sus notificaciones.'
+    );
+    const { res, continued } = await runMiddleware(
+      requireSocio,
+      { id: 20, rol: 5 },
+      'GET',
+      '/notificaciones'
+    );
+    assert.equal(res.getStatusCode(), 403, `${tipo} no debe consultar notificaciones`);
+    assert.equal(continued, false);
   }
+
+  const requireSocio = createRequireRoles(async () => 'socio')(
+    ['socio'],
+    'Solo los socios pueden acceder a sus notificaciones.'
+  );
+  const { continued } = await runMiddleware(
+    requireSocio,
+    { id: 20, rol: 3 },
+    'PUT',
+    '/notificaciones/17/leida'
+  );
+  assert.equal(continued, true);
 });
 
-test('Permisos Módulo 3: gerente tiene acceso habilitado para gestión', async () => {
-  const app = express();
-  app.use(express.json());
-  app.use((req, res, next) => {
-    req.usuario = { id: 1, rol: 4 };
-    next();
+test('Permisos Módulo 3: gerente puede gestionar clases', async () => {
+  const requireAgendaManager = createRequireAgendaManager({
+    getCurrentUserRole: async () => 'gerente'
   });
-  app.use('/api/v1/clases', activityRouter);
+  const { continued, res } = await runMiddleware(
+    requireAgendaManager,
+    { id: 1, rol: 4 },
+    'POST',
+    '/',
+    { idSede: 1 }
+  );
 
-  const server = app.listen(0);
-  const port = server.address().port;
+  assert.equal(res.getStatusCode(), 200);
+  assert.equal(continued, true);
+});
 
-  try {
-    // Al listar inscripciones de una clase inexistente, supera el middleware de rol y llega al servicio (404)
-    const resInsc = await fetch(`http://127.0.0.1:${port}/api/v1/clases/99999/inscripciones`);
-    assert.notEqual(resInsc.status, 403, 'No debe ser rechazado por 403');
-    assert.equal(resInsc.status, 404);
-  } finally {
-    server.close();
-  }
+test('Permisos Módulo 3: recepcionista puede gestionar clases de su sede', async () => {
+  const requireAgendaManager = createRequireAgendaManager({
+    getCurrentUserRole: async () => 'recepcionista',
+    getAssignedSiteForUser: async () => 1,
+    getActivityById: async () => ({ id: 12, idSede: 1 })
+  });
+  const { continued } = await runMiddleware(
+    requireAgendaManager,
+    { id: 20, rol: 5 },
+    'PUT',
+    '/12',
+    { idSede: 1 },
+    { id: '12' }
+  );
+
+  assert.equal(continued, true);
 });
 
 test('Permisos Módulo 3: recepcionista no puede mover una clase a otra sede', async () => {
@@ -113,19 +173,76 @@ test('Permisos Módulo 3: recepcionista no puede mover una clase a otra sede', a
     getAssignedSiteForUser: async () => 1,
     getActivityById: async () => ({ id: 12, idSede: 1 })
   });
-  const { req, res } = createMockReqRes(
+  const { res, continued } = await runMiddleware(
+    requireAgendaManager,
     { id: 20, rol: 5 },
     'PUT',
     '/12',
     { idSede: 2 },
     { id: '12' }
   );
-  let continued = false;
-
-  await requireAgendaManager(req, res, () => {
-    continued = true;
-  });
 
   assert.equal(res.getStatusCode(), 403);
   assert.equal(continued, false);
+});
+
+test('Permisos Módulo 3: recepción solo lista la sede asignada aunque solicite otra', async () => {
+  let sedeConsultada;
+  const controller = createGetActivitiesController({
+    getCurrentUserRole: async () => 'recepcionista',
+    getAssignedSiteForUser: async () => 1,
+    getAllActivities: async (_idUsuario, idSede) => {
+      sedeConsultada = idSede;
+      return [{ id: 12, idSede }];
+    }
+  });
+  const response = await runController(controller, {
+    usuario: { id: 20, rol: 5 },
+    query: { idSede: '2' }
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(sedeConsultada, 1);
+  assert.deepEqual(response.body, [{ id: 12, idSede: 1 }]);
+});
+
+test('Permisos Módulo 3: recepción no puede consultar el detalle de otra sede', async () => {
+  const controller = createGetActivityByIdController({
+    getCurrentUserRole: async () => 'recepcionista',
+    getAssignedSiteForUser: async () => 1,
+    getActivityById: async () => ({ id: 12, idSede: 2 })
+  });
+  const response = await runController(controller, {
+    usuario: { id: 20, rol: 5 },
+    params: { id: '12' }
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.message, 'La clase no pertenece a tu sede asignada.');
+});
+
+test('Permisos Módulo 3: recepción no puede crear, modificar ni eliminar clases de otra sede', async () => {
+  const requireAgendaManager = createRequireAgendaManager({
+    getCurrentUserRole: async () => 'recepcionista',
+    getAssignedSiteForUser: async () => 1,
+    getActivityById: async () => ({ id: 12, idSede: 2 })
+  });
+  const requests = [
+    { method: 'POST', path: '/', body: { idSede: 2 } },
+    { method: 'PUT', path: '/12', body: { idSede: 2 }, params: { id: '12' } },
+    { method: 'DELETE', path: '/12', params: { id: '12' } }
+  ];
+
+  for (const request of requests) {
+    const { res, continued } = await runMiddleware(
+      requireAgendaManager,
+      { id: 20, rol: 5 },
+      request.method,
+      request.path,
+      request.body,
+      request.params
+    );
+    assert.equal(res.getStatusCode(), 403, `${request.method} debe ser rechazado`);
+    assert.equal(continued, false);
+  }
 });
