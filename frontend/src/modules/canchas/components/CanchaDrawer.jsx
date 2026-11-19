@@ -5,10 +5,11 @@ import { HorarioSlotCard } from './HorarioSlotCard';
 export function CanchaDrawer({ cancha, fecha, alCerrar, alReservarSlot }) {
   if (!cancha) return null;
 
-  const formatearTipo = (tipoRaw) => {
-    if (!tipoRaw || typeof tipoRaw !== 'string') return 'CANCHA';
-    return tipoRaw.trim().replace(/\s*[-/]\s*/g, ' • ').toUpperCase();
-  };
+  const tipoTexto =
+    cancha.tipoFormateado ||
+    (typeof cancha.tipo === 'string'
+      ? cancha.tipo.trim().replace(/\s*[-/]\s*/g, ' • ').toUpperCase()
+      : 'CANCHA');
 
   const formatearFechaDisplay = (str) => {
     if (!str) return '';
@@ -24,35 +25,44 @@ export function CanchaDrawer({ cancha, fecha, alCerrar, alReservarSlot }) {
         {/* Encabezado del Drawer */}
         <div className="drawer-header">
           <div>
-            <span className="drawer-badge">{formatearTipo(cancha.tipo)}</span>
+            <span className="drawer-badge">{tipoTexto}</span>
             <h3>{cancha.nombre}</h3>
             <p className="drawer-fecha">
               Turnos para: <strong>{formatearFechaDisplay(fecha)}</strong>
             </p>
           </div>
-          <button type="button" className="btn-close-drawer" onClick={alCerrar}>✕</button>
+          <button type="button" className="btn-close-drawer" onClick={alCerrar}>
+            ✕
+          </button>
         </div>
 
         {/* Leyenda de colores */}
         <div className="drawer-leyenda">
-          <span><span className="dot dot-libre"></span> Libre</span>
-          <span><span className="dot dot-pico"></span> Pico</span>
-          <span><span className="dot dot-ocupado"></span> Ocupado</span>
+          <span>
+            <span className="dot dot-libre"></span> Libre
+          </span>
+          <span>
+            <span className="dot dot-pico"></span> Pico
+          </span>
+          <span>
+            <span className="dot dot-ocupado"></span> Ocupado
+          </span>
         </div>
 
         {/* Lista de slots */}
         <div className="drawer-slots-container">
           {cancha.slots && cancha.slots.length > 0 ? (
             cancha.slots.map((slot, i) => (
-              <HorarioSlotCard 
-                key={slot.id || i} 
+              <HorarioSlotCard
+                key={slot.id || `${slot.inicio}-${slot.fin}-${i}`}
                 slot={slot}
-                fecha={fecha}
-                onReservar={alReservarSlot} 
+                onReservar={alReservarSlot}
               />
             ))
           ) : (
-            <p className="drawer-no-slots">No hay horarios configurados para este día.</p>
+            <p className="drawer-no-slots">
+              No hay horarios configurados para este día.
+            </p>
           )}
         </div>
       </aside>

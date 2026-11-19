@@ -54,11 +54,11 @@ export function UserProfileCard({ onLogout }) {
               alt={nombreMostrar}
               className="user-avatar-photo"
               onError={() => {
-                console.warn('⚠️ La imagen falló al cargar desde la URL:', fotoUrl);
+                
                 setErrorImagen(true);
               }}
               onLoad={() => {
-                console.log(' Imagen de perfil cargada con éxito:', fotoUrl);
+                
               }}
             />
           ) : (

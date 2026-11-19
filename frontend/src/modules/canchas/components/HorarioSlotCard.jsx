@@ -1,31 +1,54 @@
 import React from 'react';
 import './HorarioSlotCard.css';
 
-export function HorarioSlotCard({ slot, fecha, onReservar }) {
+const estrategiaTurnoPasado = {
+  textoBoton: 'No disponible',
+  disabled: true,
+  claseEstado: 'slot-ocupado',
+  puedeReservar: false,
+};
+
+const estrategiaTurnoOcupado = {
+  textoBoton: 'Ocupado',
+  disabled: true,
+  claseEstado: 'slot-ocupado',
+  puedeReservar: false,
+};
+
+const estrategiaTurnoDisponible = {
+  textoBoton: 'Reservar',
+  disabled: false,
+  claseEstado: '',
+  puedeReservar: true,
+};
+
+const resolverEstrategiaSlot = (slot) => {
+  if (slot.esTurnoPasado) return estrategiaTurnoPasado;
+  if (slot.estaOcupado) return estrategiaTurnoOcupado;
+  return estrategiaTurnoDisponible;
+};
+
+export function HorarioSlotCard({ slot, onReservar }) {
   const precioBase = Number(slot.precioBase ?? slot.precio_base ?? slot.precio ?? 0);
-  const precioFinal = slot.precioSocio ? Number(slot.precioSocio) : Math.round(precioBase * 0.85);
+  const precioFinal =
+    slot.precioFinal !== undefined
+      ? Number(slot.precioFinal)
+      : slot.precioSocio
+      ? Number(slot.precioSocio)
+      : Math.round(precioBase * 0.85);
 
-  // Verificación de fecha y hora actual local
-  const ahora = new Date();
-  const anio = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-  const dia = String(ahora.getDate()).padStart(2, '0');
-  const fechaHoyStr = `${anio}-${mes}-${dia}`;
+  const estrategia = resolverEstrategiaSlot(slot);
 
-  const esHoy = fecha === fechaHoyStr;
-  const horaActualStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-
-  // Comprobar si el turno ya caducó en el día de hoy
-  const esTurnoPasado = esHoy && Boolean(slot.inicio && slot.inicio <= horaActualStr);
-  const estaOcupado = slot.estado?.toLowerCase() !== 'libre';
-  const noDisponible = estaOcupado || esTurnoPasado;
-
-  const textoBoton = esTurnoPasado ? 'No disponible' : estaOcupado ? 'Ocupado' : 'Reservar';
+  const handleClick = () => {
+    if (estrategia.puedeReservar) {
+      onReservar?.(slot);
+    }
+  };
 
   return (
     <div
       className={`slot-row-item ${slot.esPico ? 'slot-pico' : ''} ${
-        noDisponible ? 'slot-ocupado' : ''
+        estrategia.claseEstado
       }`}
     >
       {/* 1. Módulo Horario */}
@@ -52,15 +75,15 @@ export function HorarioSlotCard({ slot, fecha, onReservar }) {
         </div>
       </div>
 
-      {/* 3. Acción única (sin reserva express) */}
+      {/* 3. Acción */}
       <div className="slot-col-acciones">
         <button
           type="button"
           className="btn-reservar-sm"
-          disabled={noDisponible}
-          onClick={() => onReservar?.(slot)}
+          disabled={estrategia.disabled}
+          onClick={handleClick}
         >
-          {textoBoton}
+          {estrategia.textoBoton}
         </button>
       </div>
     </div>

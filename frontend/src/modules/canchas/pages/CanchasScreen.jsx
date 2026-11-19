@@ -7,6 +7,7 @@ import { ModalCheckoutReserva } from '../components/ModalCheckoutReserva';
 import { MensajeFlotante } from '../../../shared/components/MensajeFlotante';
 import { procesarCheckoutReserva } from '../services/reservaCanchaService';
 import { useCanchasDisponibilidad } from '../hooks/useCanchasDisponibilidad';
+import { useCanchasFiltradas } from '../hooks/useCanchasFiltradas';
 import './CanchasScreen.css';
 
 export default function CanchasScreen() {
@@ -14,19 +15,23 @@ export default function CanchasScreen() {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [canchaSeleccionada, setCanchaSeleccionada] = useState(null);
   const [slotSeleccionado, setSlotSeleccionado] = useState(null);
-  const [filtroTipo, setFiltroTipo] = useState('TODAS');
   const [procesandoReserva, setProcesandoReserva] = useState(false);
   const [mensajeFlotante, setMensajeFlotante] = useState(null);
 
-  // Hook personalizado de disponibilidad y API
   const { canchas, cargando, recargar } = useCanchasDisponibilidad(
     sedeSeleccionada?.id,
     fecha
   );
 
-  // Paginación
-  const [paginaActual, setPaginaActual] = useState(1);
-  const canchasPorPagina = 3;
+  const {
+    filtroTipo,
+    paginaActual,
+    totalPaginas,
+    canchasFiltradas,
+    canchasPaginadas,
+    setPaginaActual,
+    handleCambiarFiltro,
+  } = useCanchasFiltradas(canchas, 3);
 
   // Sincronizar la cancha abierta en el Drawer si la lista cambia
   useEffect(() => {
@@ -35,12 +40,6 @@ export default function CanchasScreen() {
       setCanchaSeleccionada(actualizada || null);
     }
   }, [canchas]);
-
-  // Si cambia el filtro de deporte, reseteamos a la página 1
-  const handleCambiarFiltro = (tipo) => {
-    setFiltroTipo(tipo);
-    setPaginaActual(1);
-  };
 
   const handleAbrirCheckout = (slot) => {
     setSlotSeleccionado(slot);
@@ -71,7 +70,7 @@ export default function CanchasScreen() {
         mensaje: '¡Turno reservado y pago registrado correctamente!',
       });
 
-      await recargar();
+      await recargar({ forzarRecarga: true });
     } catch (error) {
       console.error('Fallo en la reserva:', error);
       setMensajeFlotante({
@@ -82,18 +81,6 @@ export default function CanchasScreen() {
       setProcesandoReserva(false);
     }
   };
-
-  // 1. Filtrado dinámico
-  const canchasFiltradas = canchas.filter((c) => {
-    if (filtroTipo === 'TODAS') return true;
-    const deporteCancha = (c.tipo || '').split(/\s*-\s*/)[0].trim().toUpperCase();
-    return deporteCancha === filtroTipo;
-  });
-
-  // 2. Paginado
-  const totalPaginas = Math.ceil(canchasFiltradas.length / canchasPorPagina) || 1;
-  const indiceInicio = (paginaActual - 1) * canchasPorPagina;
-  const canchasPaginadas = canchasFiltradas.slice(indiceInicio, indiceInicio + canchasPorPagina);
 
   return (
     <div className="canchas-container">
@@ -113,14 +100,15 @@ export default function CanchasScreen() {
       {cargando ? (
         <div className="canchas-empty">Cargando catálogo de canchas...</div>
       ) : canchasFiltradas.length === 0 ? (
-        <div className="canchas-empty">No hay canchas disponibles para los filtros seleccionados.</div>
+        <div className="canchas-empty">
+          No hay canchas disponibles para los filtros seleccionados.
+        </div>
       ) : (
         <>
           <div className="catalogo-canchas-grid">
             {canchasPaginadas.map((cancha) => (
               <CanchaCard
                 key={cancha.id}
-                fecha={fecha}
                 cancha={cancha}
                 alSeleccionar={(c) => setCanchaSeleccionada(c)}
               />

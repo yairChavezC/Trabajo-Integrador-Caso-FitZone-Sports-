@@ -93,7 +93,7 @@ export const accesoService = {
             const payload = response?.data || response;
             if (payload && Array.isArray(payload.socios)) {
                 offlineStorageAdapter.guardarPadron(payload);
-                console.info(`✅ [Modo Offline] Padrón sincronizado (${payload.socios.length} socios).`);
+                
             }
             return payload;
         } catch (error) {
