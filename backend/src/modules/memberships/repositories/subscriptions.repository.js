@@ -23,5 +23,12 @@ export function createSubscriptionsRepository(pool) {
     return result.rows[0];
   }
 
-  return { findByUsuario, upsert };
+    async function vincularPago(idPago, idSuscripcion) {
+    await pool.query('UPDATE pagos SET id_suscripcion = $1 WHERE id = $2', [
+      idSuscripcion,
+      idPago,
+    ]);
+  }
+
+  return { findByUsuario, upsert, vincularPago }
 }

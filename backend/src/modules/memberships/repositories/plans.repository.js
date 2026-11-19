@@ -1,5 +1,5 @@
 export function createPlansRepository(pool) {
-  const COLUMNAS = 'id, nombre, precio, intervalo, duracion_dias, activo';
+const COLUMNAS = 'id, nombre, precio, intervalo, duracion_dias, activo, tipo';
 
   async function findAll({ soloActivos = false } = {}) {
     const where = soloActivos ? 'WHERE activo = true' : '';

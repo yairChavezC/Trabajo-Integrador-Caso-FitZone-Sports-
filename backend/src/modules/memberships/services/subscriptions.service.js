@@ -80,10 +80,7 @@ export function createSubscriptionsService({
       fechaProximoVencimiento: nuevoVencimiento.toISOString().slice(0, 10),
     });
 
-    await pool.query('UPDATE pagos SET id_suscripcion = $1 WHERE id = $2', [
-      suscripcion.id,
-      resultadoPago.payment.id,
-    ]);
+      await subscriptionsRepository.vincularPago(resultadoPago.payment.id, suscripcion.id);
 
     // Observer: notificamos a todos los suscriptores tras confirmar la renovación
     await subject.notify({
