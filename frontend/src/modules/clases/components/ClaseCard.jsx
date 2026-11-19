@@ -1,57 +1,67 @@
 import { useState } from 'react';
-import { getInscripcionesClase } from '../services/claseService';
 import { estadoLabel, formatoFecha, formatoHora } from '../utils/claseUtils';
+import EstadoBadge from './EstadoBadge';
 import InscriptosList from './InscriptosList';
+import ConfirmDialog from './ConfirmDialog';
 
 export default function ClaseCard({
   clase,
   modoAdministracion,
-  soloLectura,
   onReservar,
   onCancelar,
   onListaEspera,
   onAceptarOferta,
   onDelete,
   onEdit,
-  isActionPending
+  isActionPending,
+  inscriptos,
+  cargandoInscriptos = false,
+  errorInscriptos = null,
+  onLoadInscriptos
 }) {
-  const [inscriptos, setInscriptos] = useState(null);
-  const [cargandoInscriptos, setCargandoInscriptos] = useState(false);
-  const [errorInscriptos, setErrorInscriptos] = useState(null);
+  const [mostrarInscriptos, setMostrarInscriptos] = useState(false);
+  const [confirmandoCancelacion, setConfirmandoCancelacion] = useState(false);
+
   const mia = clase.miInscripcion;
   const llena = Number(clase.cupoDisponible) <= 0;
-  const puedeMostrarAcciones = !modoAdministracion && !soloLectura;
+  const tieneInscripciones = clase.tieneInscripciones === true;
+  const puedeMostrarAcciones = !modoAdministracion;
   const estaPendiente = (accion) => isActionPending?.(accion, clase.id) ?? false;
 
-  const toggleInscriptos = async () => {
-    if (inscriptos) {
-      setInscriptos(null);
+  const motivoNoPuedeCancelar = mia?.estado === 'confirmado'
+    ? 'Las reservas confirmadas requieren al menos 2 horas de anticipación y no se pueden cancelar después del inicio.'
+    : 'No se puede cancelar una inscripción después de que comienza la clase.';
+
+  const mensajeCancelacion = mia?.estado === 'confirmado'
+    ? 'Las reservas confirmadas se pueden cancelar hasta 2 horas antes del inicio. ¿Querés continuar?'
+    : mia?.estado === 'notificado'
+      ? '¿Querés rechazar la oferta? El lugar se liberará para otra persona.'
+      : '¿Querés salir de la lista de espera? Podés hacerlo antes de que comience la clase.';
+
+  const toggleInscriptos = () => {
+    if (mostrarInscriptos && !errorInscriptos) {
+      setMostrarInscriptos(false);
       return;
     }
 
-    try {
-      setCargandoInscriptos(true);
-      setErrorInscriptos(null);
-      const resultado = await getInscripcionesClase(clase.id);
-      setInscriptos(Array.isArray(resultado) ? resultado : resultado?.data ?? []);
-    } catch (error) {
-      setErrorInscriptos(error.message);
-    } finally {
-      setCargandoInscriptos(false);
-    }
+    setMostrarInscriptos(true);
+    void onLoadInscriptos?.(clase.id);
   };
+  const etiquetaInscriptos = cargandoInscriptos
+    ? 'Cargando...'
+    : errorInscriptos
+      ? 'Reintentar carga'
+      : mostrarInscriptos
+        ? 'Ocultar inscriptos'
+        : 'Ver inscriptos';
 
   const confirmarCancelacion = () => {
-    const mensaje = mia.estado === 'confirmado'
-      ? '¿Querés cancelar esta reserva?'
-      : mia.estado === 'notificado'
-        ? '¿Querés rechazar el lugar ofrecido?'
-        : '¿Querés salir de la lista de espera?';
-    if (window.confirm(mensaje)) onCancelar(clase.id);
+    setConfirmandoCancelacion(true);
   };
 
   return (
-    <article className="clase-card">
+    <>
+      <article className="clase-card">
       <h3>{clase.nombre}</h3>
       <p><strong>Instructor:</strong> {clase.profesor}</p>
       <p>
@@ -60,7 +70,24 @@ export default function ClaseCard({
       <p><strong>Lugares:</strong> {clase.cupoDisponible ?? clase.cupo} disponibles de {clase.cupo}</p>
       <p><strong>Sede:</strong> {clase.sede || `Sede ${clase.idSede}`}</p>
       {!modoAdministracion && mia && (
-        <p className="clase-estado">{estadoLabel(mia)}</p>
+        <div
+          className={`clase-mi-inscripcion estado-${mia.estado.replaceAll(' ', '-')}`}
+          role="status"
+          aria-label="Estado de inscripción"
+        >
+          <EstadoBadge estado={mia.estado} />
+          {mia.estado === 'notificado' ? (
+            <p className="clase-inscripcion-detalle">
+              Aceptá antes del{' '}
+              <time dateTime={mia.fechaExpiracionOferta}>
+                {formatoFecha(mia.fechaExpiracionOferta)}
+              </time>
+              . Si vence, el lugar se ofrecerá a otra persona.
+            </p>
+          ) : (
+            <p className="clase-inscripcion-detalle">{estadoLabel(mia)}</p>
+          )}
+        </div>
       )}
 
       <div className="clase-actions">
@@ -95,17 +122,24 @@ export default function ClaseCard({
           <button
             type="button"
             className="btn-secondary"
-            disabled={!clase.puedeCancelar || estaPendiente('cancelar')}
+            disabled={!clase.puedeCancelar || estaPendiente('cancelar') || confirmandoCancelacion}
             onClick={confirmarCancelacion}
           >
             {estaPendiente('cancelar')
               ? 'Cancelando...'
-              : mia.estado === 'notificado'
-                ? 'Rechazar lugar ofrecido'
-                : mia.estado === 'en espera'
-                  ? 'Salir de la lista de espera'
-                  : 'Cancelar reserva'}
+              : confirmandoCancelacion
+                ? 'Confirmando...'
+                : mia.estado === 'notificado'
+                  ? 'Rechazar lugar ofrecido'
+                  : mia.estado === 'en espera'
+                    ? 'Salir de la lista de espera'
+                    : 'Cancelar reserva'}
           </button>
+        )}
+        {puedeMostrarAcciones && mia && !clase.puedeCancelar && (
+          <p className="clase-action-note" role="note">
+            {motivoNoPuedeCancelar}
+          </p>
         )}
         {modoAdministracion && (
           <>
@@ -115,11 +149,7 @@ export default function ClaseCard({
               onClick={toggleInscriptos}
               disabled={cargandoInscriptos}
             >
-              {cargandoInscriptos
-                ? 'Cargando...'
-                : inscriptos
-                  ? 'Ocultar inscriptos'
-                  : 'Ver inscriptos'}
+              {etiquetaInscriptos}
             </button>
             <button type="button" className="btn-secondary" onClick={() => onEdit(clase)}>
               Editar
@@ -128,16 +158,39 @@ export default function ClaseCard({
               type="button"
               className="btn-danger"
               onClick={() => onDelete(clase.id)}
-              disabled={estaPendiente('eliminar')}
+              aria-describedby={tieneInscripciones ? `clase-${clase.id}-delete-note` : undefined}
+              disabled={tieneInscripciones || estaPendiente('eliminar')}
             >
               {estaPendiente('eliminar') ? 'Eliminando...' : 'Eliminar'}
             </button>
+            {tieneInscripciones && (
+              <p id={`clase-${clase.id}-delete-note`} className="clase-delete-note" role="note">
+                No se puede eliminar: esta clase tiene inscripciones y su historial debe conservarse.
+              </p>
+            )}
           </>
         )}
       </div>
 
-      {errorInscriptos && <p className="clases-alert" role="alert">{errorInscriptos}</p>}
-      {modoAdministracion && inscriptos && <InscriptosList inscriptos={inscriptos} />}
+      {modoAdministracion && mostrarInscriptos && errorInscriptos && (
+        <p className="clases-alert" role="alert">{errorInscriptos}</p>
+      )}
+      {modoAdministracion && mostrarInscriptos && !errorInscriptos && Array.isArray(inscriptos) && (
+        <InscriptosList inscriptos={inscriptos} />
+      )}
     </article>
+    <ConfirmDialog
+      open={confirmandoCancelacion}
+      title="Cancelar inscripción"
+      message={mensajeCancelacion}
+      confirmText="Confirmar"
+      cancelText="Cancelar"
+      onConfirm={() => {
+        onCancelar(clase.id);
+        setConfirmandoCancelacion(false);
+      }}
+      onCancel={() => setConfirmandoCancelacion(false)}
+    />
+  </>
   );
 }

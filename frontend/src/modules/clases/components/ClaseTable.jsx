@@ -8,9 +8,12 @@ export default function ClaseTable({
   onCancelar,
   onListaEspera,
   onAceptarOferta,
-  soloLectura = false,
   modoAdministracion = false,
-  isActionPending
+  isActionPending,
+  inscriptosPorClase = {},
+  cargandoInscriptosPorClase = {},
+  errorInscriptosPorClase = {},
+  onLoadInscriptos
 }) {
   if (!clases.length) {
     return (
@@ -29,7 +32,6 @@ export default function ClaseTable({
           key={clase.id}
           clase={clase}
           modoAdministracion={modoAdministracion}
-          soloLectura={soloLectura}
           onDelete={onDelete}
           onEdit={onEdit}
           onReservar={onReservar}
@@ -37,6 +39,10 @@ export default function ClaseTable({
           onListaEspera={onListaEspera}
           onAceptarOferta={onAceptarOferta}
           isActionPending={isActionPending}
+          inscriptos={inscriptosPorClase[clase.id]}
+          cargandoInscriptos={cargandoInscriptosPorClase[clase.id]}
+          errorInscriptos={errorInscriptosPorClase[clase.id]}
+          onLoadInscriptos={onLoadInscriptos}
         />
       ))}
     </div>
