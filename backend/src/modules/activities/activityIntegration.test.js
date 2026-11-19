@@ -556,7 +556,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
       assert.equal(rowsInelig[0].estado, 'no_elegible');
     });
 
-    await t.test('6. No elimina una clase con inscripciones en lista de espera', async () => {
+    await t.test('6. No elimina una clase con inscripciones en lista de espera, pero sí si solo tiene canceladas', async () => {
       const fechaInicioEspera = new Date(Date.now() + 18 * 60 * 60 * 1000);
       const fechaFinEspera = new Date(fechaInicioEspera.getTime() + 60 * 60 * 1000);
       const { rows: claseRows } = await pool.query(
@@ -580,7 +580,7 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
         (error) =>
           error instanceof BusinessError &&
           error.status === 409 &&
-          error.message.includes('1 inscripción asociada')
+          error.message.includes('1 inscripción activa')
       );
 
       const { rows: preservedRows } = await pool.query(
@@ -590,6 +590,23 @@ test('Integración PostgreSQL - Módulo 3 Clases Grupales', {
         [claseConEsperaId, inscripcionRows[0].id]
       );
       assert.deepEqual(preservedRows[0], { clases: 1, inscripciones: 1 });
+
+      // Si la inscripción pasa a cancelada, ya no hay inscripciones activas y se puede eliminar
+      await pool.query(
+        `UPDATE public.inscripciones_clase_grupal SET estado = 'cancelado' WHERE id = $1`,
+        [inscripcionRows[0].id]
+      );
+
+      const eliminada = await activityService.deleteActivity(claseConEsperaId);
+      assert.equal(Number(eliminada.id), Number(claseConEsperaId));
+
+      const { rows: afterDeleteRows } = await pool.query(
+        `SELECT
+           (SELECT COUNT(*) FROM public.clase_grupal WHERE id = $1)::int AS clases,
+           (SELECT COUNT(*) FROM public.inscripciones_clase_grupal WHERE id = $2)::int AS inscripciones`,
+        [claseConEsperaId, inscripcionRows[0].id]
+      );
+      assert.deepEqual(afterDeleteRows[0], { clases: 0, inscripciones: 0 });
     });
 
     // -------------------------------------------------------------
