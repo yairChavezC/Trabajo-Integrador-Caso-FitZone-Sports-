@@ -34,3 +34,4 @@
 - Redacción, revisión y formalización de los diez Registros de Decisión Arquitectónica (`ADR-001.md` a `ADR-010.md`) en `docs/adr/` conforme a la plantilla del Anexo B (arquitectura monolito modular, base PostgreSQL/Supabase, contingencia offline, control de concurrencia, stack Node/Express y React, sincronización de sede, estrategia de pruebas, despliegue/rollback con Docker y tratamiento/tokenización de pagos).
 - Integración y subida de los ADRs al repositorio remoto en `main` (commit `f496514`), resolviendo sincronización previa con `git pull --rebase origin main`.
 '@ | Set-Content -Path "docs\bitacoras\LOG-erios.md" -Encoding UTF8
+- Redaccion y subida del Manual de Usuario (docs/manuales/MANUAL-USUARIO.md) y Manual Tecnico y de Despliegue (docs/manuales/MANUAL-TECNICO-DESPLIEGUE.md, commit 2c90bb).
