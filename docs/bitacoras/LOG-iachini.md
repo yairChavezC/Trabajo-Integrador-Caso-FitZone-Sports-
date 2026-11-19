@@ -198,3 +198,35 @@ Integré la validación de roles en el flujo de Clientes Externos (`id_rol = 2` 
 
 **Commits**
 `6a93887` fix(accesses): validar roles en ingreso externo y reutilizar cuentas existentes por DNI `47a8f64` refactor(accesses): aplicar DI, pipeline de reglas OCP y pruebas de casos borde en backend `694a0c0` refactor(acceso): aplicar patron Adapter en localStorage, Design Tokens semanticos y Atomic Design
+
+### Fecha: 2026-11-17
+* **Sprint / Unidad:** Sprint 7 – Unidad IV / V (Módulo de Control de Acceso y Frontend)
+* **Actividad concreta realizada:**
+  * Migré los componentes restantes del módulo de acceso (como `AforoCard.jsx`) a *Design Tokens* semánticos, eliminando colores hexadecimales hardcodeados.
+  * Desacoplé las llamadas HTTP directas y el acceso a `localStorage` de las pantallas `SocioDashboard.jsx` y `CredencialScreen.jsx`, centralizando esa lógica en `accesoService.js` y el hook `UseHistorialSocio.js`.
+  * Incorporé la validación estricta de la fecha de vencimiento de la suscripción en el molinete (`accessService.js` y `accessRepository.js`) y normalicé el formato del historial de accesos en `HistorialAccesosTable.jsx`.
+  * Rediseñé visualmente `SocioDashboard.jsx` (junto con `AccesoScreen.css`) y normalicé la carga de inscripciones a clases grupales del socio.
+* **Decisiones adoptadas:**
+  * Mantener una separación estricta entre la capa de presentación (componentes React) y la capa de datos/infraestructura (`accesoService.js`), evitando que las pantallas manipulen `localStorage` o realicen peticiones directamente.
+  * Validar la vigencia de la cuota directamente contra `fecha_proximo_vencimiento` en el pipeline de reglas de admisión del backend para reforzar el cumplimiento de RF-02.
+* **Problemas encontrados y resueltos:**
+  * *Problema:* El molinete validaba el estado textual de la suscripción, pero no bloqueaba el ingreso si la fecha de vencimiento ya había caducado sin actualizarse el estado. *Solución:* Se agregó la verificación de fecha de vencimiento en `accessService.js` y se normalizó la respuesta en el repositorio.
+  * *Problema:* Inconsistencias en el renderizado del historial y las inscripciones a clases dentro del dashboard del socio. *Solución:* Se normalizaron los datos recibidos en `accesoService.js` y `HistorialAccesosTable.jsx`.
+* **Commits asociados:** `c427838`, `93618a1`, `4132156`, `00028ff`
+* **Horas efectivas de trabajo:** 5 hs
+
+
+### Fecha: 2026-11-18
+* **Sprint / Unidad:** Sprint 8 – Unidad V (Calidad, UX y Pruebas Automatizadas)
+* **Actividad concreta realizada:**
+  * Corregí el manejo de estado en el hook `useAcceso.js` para asegurar la correcta visualización del mensaje de salida cuando un socio escanea su QR para retirarse de la sede.
+  * Creé el componente `Snackbar.jsx` y lo integré en `AccesoScreen.jsx` y `CredencialScreen.jsx` (con sus estilos en `AccesoScreen.css`) para reemplazar las alertas nativas del navegador (`alert`) por notificaciones no intrusivas, incluyendo el aviso de alta e ingreso de clientes externos.
+  * Reorganicé la estructura de pruebas unitarias del módulo de accesos (`backend/test/modules/accesses/unit/accessService.test.js`) y amplié la cobertura de `AccessService` agregando nuevos casos de prueba.
+* **Decisiones adoptadas:**
+  * Reemplazar todos los cuadros emergentes nativos (`alert`) por un componente `Snackbar` propio para mejorar la experiencia de usuario en la terminal de recepción y cumplir con las observaciones de QA del equipo.
+  * Estandarizar la ubicación de los tests unitarios y esquemas de prueba bajo `backend/test/` para mantener prolija la ejecución del pipeline de CI.
+* **Problemas encontrados y resueltos:**
+  * *Problema:* Al escanear la salida de un socio en la terminal de recepción, el backend registraba correctamente el egreso, pero la interfaz no mostraba el cartel informativo de salida. *Solución:* Se corrigió la forma en que `useAcceso.js` procesaba y exponía el resultado del servicio hacia `AccesoScreen.jsx`.
+  * *Problema:* Baja cobertura en algunos caminos alternativos de `AccessService`. *Solución:* Se fortaleció la suite en `accessService.test.js` cubriendo más escenarios de validación y errores.
+* **Commits asociados:** `95adbfa`, `e54abf6`, `34592d0`
+* **Horas efectivas de trabajo:** 4 hs
