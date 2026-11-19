@@ -1,25 +1,61 @@
 export function createUsersRepository(pool) {
-  const COLUMNAS = 'id, dni, nombre, contacto, foto, id_rol, activo, creado_at';
+  const SELECT_USUARIO = `
+    SELECT
+      u.id, u.dni, u.nombre, u.contacto, u.foto, u.id_rol, u.activo, u.creado_at,
+      s.estado AS estado_suscripcion,
+      s.fecha_proximo_vencimiento,
+      s.descuento,
+      s.id_plan
+    FROM usuario u
+    LEFT JOIN suscripcion s ON s.id_usuario = u.id
+  `;
+
+  async function findAll({ idRoles } = {}) {
+    const params = [];
+    let where = '';
+
+    if (Array.isArray(idRoles) && idRoles.length > 0) {
+      params.push(idRoles);
+      where = `WHERE u.id_rol = ANY($${params.length}::bigint[])`;
+    }
+
+    const result = await pool.query(
+      `${SELECT_USUARIO} ${where} ORDER BY u.nombre ASC`,
+      params
+    );
+    return result.rows;
+  }
 
   async function findById(id) {
-    const result = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE id = $1`, [id]);
+    const result = await pool.query(`${SELECT_USUARIO} WHERE u.id = $1`, [id]);
     return result.rows[0] || null;
   }
 
   async function findByDni(dni) {
-    const result = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE dni = $1`, [dni]);
+    const result = await pool.query(`SELECT id FROM usuario WHERE dni = $1`, [dni]);
     return result.rows[0] || null;
   }
 
-  async function create({ dni, nombre, contacto, foto, idRol }) {
+  async function create({ nombre, dni, contacto, password, idRol }) {
     const result = await pool.query(
-      `INSERT INTO usuario (dni, nombre, contacto, foto, id_rol, activo, creado_at)
-       VALUES ($1, $2, $3, $4, $5, true, NOW())
-       RETURNING ${COLUMNAS}`,
-      [dni, nombre, contacto, foto, idRol]
+      `INSERT INTO usuario (nombre, dni, contacto, password, id_rol, activo)
+       VALUES ($1, $2, $3, encode(digest($4, 'sha256'), 'hex'), $5, true)
+       RETURNING id, nombre, dni, contacto, id_rol, activo, creado_at`,
+      [nombre, dni, contacto, password, idRol]
     );
     return result.rows[0];
   }
 
-  return { findById, findByDni, create };
+  async function findPagosByUsuario(idUsuario) {
+    const result = await pool.query(
+      `SELECT id, monto, medio_pago, estado, fecha_pago, motivo_rechazo
+       FROM pagos
+       WHERE id_usuario = $1
+       ORDER BY fecha_pago DESC NULLS LAST, creado_at DESC`,
+      [idUsuario]
+    );
+    return result.rows;
+  }
+
+  return { findAll, findById, findByDni, create, findPagosByUsuario };
 }
