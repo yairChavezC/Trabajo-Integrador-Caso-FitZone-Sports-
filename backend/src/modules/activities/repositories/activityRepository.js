@@ -89,13 +89,8 @@ export const findAllActivities = async (idUsuario = null, idSede = null, incluir
   }
   query += ';';
 
-  try {
-    const { rows } = await pool.query(query, values);
-    return rows;
-  } catch (error) {
-    console.error('Error en activityRepository.findAllActivities:', error);
-    throw error;
-  }
+  const { rows } = await pool.query(query, values);
+  return rows;
 };
 
 export const findActivityById = async (id, idUsuario = null, client = pool) => {
@@ -108,13 +103,8 @@ export const findActivityById = async (id, idUsuario = null, client = pool) => {
     LIMIT 1;
   `;
 
-  try {
-    const { rows } = await client.query(query, [idUsuario, id]);
-    return rows[0];
-  } catch (error) {
-    console.error('Error en activityRepository.findActivityById:', error);
-    throw error;
-  }
+  const { rows } = await client.query(query, [idUsuario, id]);
+  return rows[0];
 };
 
 export const findRoleTypeById = async (idRol) => {
@@ -164,13 +154,8 @@ export const lockActivityById = async (id, client) => {
     FOR UPDATE;
   `;
 
-  try {
-    const { rows } = await client.query(query, [id]);
-    return rows[0];
-  } catch (error) {
-    console.error('Error en activityRepository.lockActivityById:', error);
-    throw error;
-  }
+  const { rows } = await client.query(query, [id]);
+  return rows[0];
 };
 
 export const createActivity = async (dto) => {
@@ -204,13 +189,8 @@ export const createActivity = async (dto) => {
     dto.fechaFin
   ];
 
-  try {
-    const { rows } = await pool.query(query, values);
-    return rows[0];
-  } catch (error) {
-    console.error('Error en activityRepository.createActivity:', error);
-    throw error;
-  }
+  const { rows } = await pool.query(query, values);
+  return rows[0];
 };
 
 export const updateActivity = async (id, dto, client = pool) => {
@@ -238,13 +218,8 @@ export const updateActivity = async (id, dto, client = pool) => {
     id
   ];
 
-  try {
-    const { rows } = await client.query(query, values);
-    return rows[0];
-  } catch (error) {
-    console.error('Error en activityRepository.updateActivity:', error);
-    throw error;
-  }
+  const { rows } = await client.query(query, values);
+  return rows[0];
 };
 
 export const deleteActivity = async (id, client = pool) => {
@@ -255,11 +230,6 @@ export const deleteActivity = async (id, client = pool) => {
       ${classColumns};
   `;
 
-  try {
-    const { rows } = await client.query(query, [id]);
-    return rows[0];
-  } catch (error) {
-    console.error('Error en activityRepository.deleteActivity:', error);
-    throw error;
-  }
+  const { rows } = await client.query(query, [id]);
+  return rows[0];
 };
